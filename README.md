@@ -1,13 +1,10 @@
 # Claude Code project kit
 
-A starting point for a project where Claude Code works inside a Docker sandbox.
-Only the project folder is mounted (at `/workspace`), so Claude cannot read
-`~/.ssh`, your other projects, or anything else on the host. On top of the
-sandbox it adds guard hooks, an agent-account GitHub workflow, and a
-`CLAUDE.md` starter.
+A template repository for a project running Claude Code working inside Docker.
 
-Make this a **template repository** on GitHub (Settings → Template
-repository). Each new project then starts from **Use this template**.
+Only the project folder is mounted (at `/workspace`), so Claude cannot read anything else on the host. There are also guard hooks for scary commands, an agent-account GitHub workflow, and a `CLAUDE.md` starter.
+
+There are easy togglable options for toolchains to include in the Docoker image. 
 
 ## What's in the box
 
@@ -58,21 +55,17 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 3. **GitHub agent account** (skip this step if Claude won't push):
    - Create a separate GitHub account for the bot. Invite it as a
      collaborator on just the repos it should touch.
-   - Give it a classic PAT with `repo` scope, plus `workflow` scope if it
+   - Create it a classic PAT scoped to `repo`, and `workflow` if it
      should edit `.github/workflows/`.
-   - Put the token in `.claude/settings.local.json`, which is gitignored. A
+   - Paste the token in `.claude/settings.local.json`, which is gitignored. A
      fresh project doesn't have that file yet, so copy the committed example
-     into place first, then paste the token between the quotes:
-
-         cp .claude/settings.local.example.json .claude/settings.local.json
-
-     `run.sh` reads the token for each `docker run` and never prints it. An
+     into place first, then paste the token between the quotes. `run.sh` reads the token for each `docker run` and never prints it. An
      empty value means no token, and the container starts without one.
    - Fill in `scripts/github.conf`: `GH_OWNER`, `GH_REPOS` (the first is the
      default), `GH_AGENT_USER`, and `MAIN_PUSH_REPOS` if any repo may take
      direct pushes to `main`.
    - Optionally, protect `main` with a ruleset as well. The wrappers refuse
-     to push there, but a ruleset is a second wall.
+     to push there, but a ruleset is a belt for the braces.
 
 4. **Fill in `CLAUDE.md`**: the project name and the build/test commands. Add
    any project rules.
@@ -82,15 +75,11 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
        bash .devcontainer/run.sh            # or --firewall
        claude                               # first time: log in (below)
 
-   The first build takes a few minutes. Later starts are instant unless
-   something changed.
+   The first build takes a few minutes after you change anything.
 
 ### First login
 
-`claude` prints a login URL. Open it in your normal browser on the host and
-sign in. Either it completes on its own, or the browser shows a code to paste
-back into the terminal (common on WSL2). The login lives in a named volume
-(`<project>-claude-config`), so it survives container restarts.
+`claude`, then do the Claude login thing.
 
 ## Using it
 
@@ -102,7 +91,7 @@ back into the terminal (common on WSL2). The login lives in a named volume
 - Run `run.sh` from inside a worktree and it still mounts the primary clone,
   so all worktrees share one container.
 - `.devcontainer/project.bashrc` holds project aliases. It is read from the
-  mount at shell start, so edits need no rebuild. A server must listen on
+  mount at shell start, so edits don't need a rebuild. A server must listen on
   `0.0.0.0` to be reachable through a published port.
 
 ### The firewall
