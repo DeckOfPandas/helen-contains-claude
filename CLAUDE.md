@@ -54,6 +54,8 @@ is the only enforcement.
   every commit.** Run it in the same command and it prints after the commit has
   already happened.
 - Commit freely. Write the message to a file: `git commit -F tmp/msg.txt`.
+- A commit subject starts with a prefix: `(feature)`, `(fix)`, `(styling)`,
+  `(design)`, `(data)`, `(docs)`, `(refactor)`, `(test)` or `(chore)`.
 - **Never `git reset --hard`, `git checkout --`, `git restore` or `git clean -f`
   over a dirty tree without asking me.** `guard-destructive-git.py` enforces it.
   To set work aside, use `git stash push -u -m <tag>`.
