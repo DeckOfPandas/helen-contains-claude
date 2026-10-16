@@ -10,6 +10,7 @@ run as `python3 <path>`, so none needs an execute bit. All are wired in
 | `guard-main-branch.py` | PreToolUse Bash | Refuses `git commit` / `git merge` on `main` or `master` |
 | `guard-destructive-git.py` | PreToolUse Bash | Refuses `reset --hard`, `checkout --`, `clean -f`, `restore` on a dirty tree; `stash drop/clear` while stashes exist |
 | `guard-token-expansion.py` | PreToolUse Bash | Refuses commands that would print a secret, embed one in a URL, or dump the environment |
+| `guard-git-output.py` | PreToolUse Bash | Refuses `--output`, `--no-index`, `--ext-diff` and `--textconv` (and prefixes of them) after `git diff`/`log`/`show`, which the allow list lets run unasked as reads |
 | `guard-unanalyzable-bash.py` | PreToolUse Bash | Refuses what the permission checker cannot read statically: heredocs, `$(...)` and backticks, pipes, `&&`/`\|\|`/`;` chains, a lone `&`, globs, a leading `cd`, `git -C`, a leading `NAME=value`, unquoted parentheses, `$[`, and a quoted `[`/`]`/`\|` in a `sh scripts/...` call |
 | `guard-inline-script.py` | PreToolUse Bash | Refuses `python3 -c`, `node -e`, `ruby -e`, `perl -e`, at any length |
 | `guard-sed.py` | PreToolUse Bash | Refuses any `sed` |
