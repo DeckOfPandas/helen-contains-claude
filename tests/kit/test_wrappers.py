@@ -24,6 +24,7 @@ MAIN_PUSH_REPOS=drafts
 @pytest.fixture
 def project(tmp_path: Path, kit_root: Path) -> Path:
     shutil.copytree(kit_root / "scripts", tmp_path / "scripts")
+    (tmp_path / "scripts" / "github.local.conf").unlink(missing_ok=True)
     (tmp_path / "scripts" / "github.conf").write_text(CONF)
     (tmp_path / "tmp").mkdir()
     (tmp_path / "tmp" / "body.md").write_text("hello\n")
@@ -36,8 +37,10 @@ def run(project: Path, script: str, *args: str, conf: str | None = None):
     return subprocess.run(
         ["sh", f"scripts/{script}", *args],
         cwd=project, capture_output=True, text=True, timeout=30,
+        # The ceiling stops git finding the kit's own checkout above the copy,
+        # whose github.local.conf would otherwise be read.
         env={"PATH": "/usr/local/bin:/usr/bin:/bin", "AGENT_WRAPPER_DRY_RUN": "1",
-             "AGENT_GH_TOKEN": "not-a-real-token"},
+             "AGENT_GH_TOKEN": "not-a-real-token", "GIT_CEILING_DIRECTORIES": str(project.parent)},
     )
 
 
@@ -187,6 +190,30 @@ def test_shipped_config_is_the_placeholder(kit_root, project):
     shipped = (kit_root / "scripts" / "github.conf").read_text()
     result = run(project, "git-fetch-main.sh", conf=shipped)
     assert refused(result) and "placeholder" in result.stderr
+
+
+def test_local_config_replaces_the_committed_one(project):
+    shipped = "GH_OWNER=your-org\nGH_REPOS=a\nGH_AGENT_USER=b\n"
+    (project / "scripts" / "github.local.conf").write_text(CONF)
+    out = ok(run(project, "git-fetch-main.sh", conf=shipped))
+    assert "https://github.com/acme/site.git" in out
+
+
+def test_a_worktree_reads_the_main_checkouts_local_config(tmp_path, kit_root):
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+    main = tmp_path / "main"
+    shutil.copytree(kit_root / "scripts", main / "scripts")
+    (main / "scripts" / "github.conf").write_text("GH_OWNER=your-org\nGH_REPOS=a\nGH_AGENT_USER=b\n")
+    (main / "scripts" / "github.local.conf").unlink(missing_ok=True)
+    (main / ".gitignore").write_text("scripts/github.local.conf\n")
+    subprocess.run([*git, "init", "-q"], cwd=main, check=True)
+    subprocess.run([*git, "add", "."], cwd=main, check=True)
+    subprocess.run([*git, "commit", "-qm", "x"], cwd=main, check=True)
+    subprocess.run([*git, "worktree", "add", "-q", str(main / "wt")], cwd=main, check=True)
+    (main / "scripts" / "github.local.conf").write_text(CONF)
+    assert not (main / "wt" / "scripts" / "github.local.conf").exists()
+    out = ok(run(main / "wt", "git-fetch-main.sh"))
+    assert "https://github.com/acme/site.git" in out
 
 
 def test_credential_helper(project):

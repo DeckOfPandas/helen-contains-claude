@@ -76,13 +76,19 @@ def test_settings_local_example_is_what_run_sh_reads(tmp_path, kit_root):
     assert done.returncode == 0 and done.stdout == ""
 
 
-def test_only_the_example_is_committed(tmp_path, kit_root):
+@pytest.mark.parametrize("local,committed", [
+    (".claude/settings.local.json", ".claude/settings.local.example.json"),
+    ("scripts/github.local.conf", "scripts/github.conf"),
+    (".devcontainer/kit.local.env", ".devcontainer/kit.local.example.env"),
+])
+def test_only_the_template_is_committed(tmp_path, kit_root, local, committed):
     shutil.copy(kit_root / ".gitignore", tmp_path / ".gitignore")
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    ignored = subprocess.run(["git", "check-ignore", "-q", ".claude/settings.local.json"], cwd=tmp_path)
-    example = subprocess.run(["git", "check-ignore", "-q", ".claude/settings.local.example.json"], cwd=tmp_path)
-    assert ignored.returncode == 0, "settings.local.json would be committed"
-    assert example.returncode == 1, "the example would not be committed"
+    ignored = subprocess.run(["git", "check-ignore", "-q", local], cwd=tmp_path)
+    template = subprocess.run(["git", "check-ignore", "-q", committed], cwd=tmp_path)
+    assert ignored.returncode == 0, f"{local} would be committed"
+    assert template.returncode == 1, f"{committed} would not be committed"
+    assert (kit_root / committed).is_file()
 
 
 def test_host_dotfiles_that_reload_bashrc_do_not_loop(tmp_path, kit_root):
@@ -119,6 +125,7 @@ STUB = '() { printf "%s\\n" "docker $*" >> "$STUB_LOG"; [ "$1" != image ]; }'
 @pytest.fixture
 def project(tmp_path: Path, kit_root: Path) -> Path:
     shutil.copytree(kit_root / ".devcontainer", tmp_path / ".devcontainer")
+    (tmp_path / ".devcontainer" / "kit.local.env").unlink(missing_ok=True)
     subprocess.run(["python3", ".devcontainer/set-project-name.py", "demo"], cwd=tmp_path, check=True,
                    capture_output=True)
     # Its own repo, or run.sh would resolve the repo root of whatever encloses it.
@@ -169,6 +176,21 @@ def test_run_sh_build_only_does_not_run(project):
     done, calls = run_sh(project, "--build-only")
     assert done.returncode == 0, done.stderr
     assert not any(c.startswith("docker run") for c in calls)
+
+
+def test_kit_local_env_overrides_the_name(project):
+    text = (project / ".devcontainer" / "kit.env").read_text().replace("PROJECT_NAME=demo", "PROJECT_NAME=changeme")
+    (project / ".devcontainer" / "kit.local.env").write_text("# mine\nPROJECT_NAME=mine\n")
+    done, calls = run_sh(project, kit_env_text=text)
+    assert done.returncode == 0, done.stderr
+    assert "--name mine-primary" in next(c for c in calls if c.startswith("docker run"))
+
+
+def test_kit_local_env_takes_only_the_name(project):
+    (project / ".devcontainer" / "kit.local.env").write_text("WITH_RUBY=1\n")
+    done, calls = run_sh(project)
+    assert done.returncode == 1 and "only PROJECT_NAME" in done.stderr
+    assert calls == []
 
 
 @pytest.mark.parametrize("edit,message", [

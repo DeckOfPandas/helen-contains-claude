@@ -12,6 +12,7 @@ There are easy togglable options for toolchains to include in the Docoker image.
 .devcontainer/
   run.sh                 build-if-stale, then start the container
   kit.env                toggles: what goes in the image, ports, firewall extras
+  kit.local.example.env  a name kept out of git (see "Working on the kit itself")
   Dockerfile             the image; every toggle is a build argument
   init-firewall.sh       optional default-deny egress allowlist
   requirements.txt       pip installs, when WITH_PY_REQS=1
@@ -26,7 +27,8 @@ There are easy togglable options for toolchains to include in the Docoker image.
   settings.json          permissions + hooks
   hooks/                 guards (see .claude/hooks/README.md); strict/ is opt-in
 scripts/
-  github.conf            owner, repos, bot account: the wrappers' whole world
+  github.conf            placeholder template for github.local.conf (gitignored):
+                         owner, repos, bot account, the wrappers' whole world
   gh-*.sh, git-*-agent.sh, git-fetch-main.sh, github-public-status.sh
 CLAUDE.md                rules starter: fill in <PROJECT> and the build commands
 tests/kit/               tests for the wrappers, hooks, stamp and config
@@ -59,10 +61,18 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
      should edit `.github/workflows/`.
    - Paste the token in `.claude/settings.local.json`, which is gitignored. A
      fresh project doesn't have that file yet, so copy the committed example
-     into place first, then paste the token between the quotes and rename the file to settings.local.json. `run.sh` reads the token for each `docker run` and never prints it. An empty value means no token, and the container starts without one.
-   - Fill in `scripts/github.conf`: `GH_OWNER`, `GH_REPOS` (the first is the
-     default), `GH_AGENT_USER`, and `MAIN_PUSH_REPOS` if any repo may take
-     direct pushes to `main`.
+     to it, leaving the example in place, then paste the token between the
+     quotes:
+
+         cp .claude/settings.local.example.json .claude/settings.local.json
+
+     `run.sh` reads the token for each `docker run` and never prints it. An
+     empty value means no token, and the container starts without one.
+   - Copy `scripts/github.conf` to `scripts/github.local.conf` (gitignored)
+     and fill that in: `GH_OWNER`, `GH_REPOS` (the first is the default),
+     `GH_AGENT_USER`, and `MAIN_PUSH_REPOS` if any repo may take direct
+     pushes to `main`. The wrappers read the local copy; from a worktree, they
+     read the main checkout's.
    - Optionally, protect `main` with a ruleset as well. The wrappers refuse
      to push there, but a ruleset is a belt for the braces.
 
@@ -146,6 +156,20 @@ token ends up printed.
 **Doesn't:** it is not a defence against a deliberate, sophisticated container
 escape. The threat model is an honest mistake. Also, the token is in the
 container's environment: the hooks make printing it hard, not impossible.
+
+## Working on the kit itself
+
+The kit is a template, so what it commits is what every new project starts
+from. Keep the committed copies as placeholders (`PROJECT_NAME=changeme`,
+`your-org`, `<PROJECT>`) and put your own values in the gitignored local files:
+
+    cp .devcontainer/kit.local.example.env .devcontainer/kit.local.env   # PROJECT_NAME
+    cp scripts/github.conf scripts/github.local.conf                     # GitHub
+    cp .claude/settings.local.example.json .claude/settings.local.json   # token
+
+`tests/kit/` fails if `scripts/github.conf` holds anything but the
+placeholders. Nothing checks the name or `CLAUDE.md`'s title, because a
+project made from the kit commits its own.
 
 ## Tests
 

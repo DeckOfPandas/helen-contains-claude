@@ -1,4 +1,4 @@
-# Claude Code Rules for Helen Contains Claude
+# Claude Code Rules for <PROJECT>
 
 **This file is the RULES.** It loads into every session, so keep it short. Where
 a rule names a hook, the hook enforces it. Where it names none, this paragraph
@@ -57,7 +57,8 @@ is the only enforcement.
 
 ## GitHub
 - The agent account's token is `AGENT_GH_TOKEN`. It reaches only the
-  repositories in `scripts/github.conf`. **Use the wrappers in `scripts/`, never
+  repositories in `scripts/github.local.conf` (`scripts/github.conf` is the
+  placeholder template). **Use the wrappers in `scripts/`, never
   bare `gh` or `git push`.**
 - **Never print, echo, log or commit the token, and never put its name in an
   `echo` or `printf`.** `guard-token-expansion.py` enforces it. To find out

@@ -61,35 +61,47 @@ PORTS=""
 EXTRA_ALLOWED_DOMAINS=""
 MOUNT_DOTFILES=1
 
+# read_kit_file <file> <local>: with <local> = 1, only PROJECT_NAME is accepted.
+read_kit_file() {
+  local file="$1" only_name="$2" line key value
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [ -z "$line" ] && continue
+    case "$line" in
+      *=*) ;;
+      *) die "$file: '$line' is not KEY=value" ;;
+    esac
+    key="${line%%=*}"
+    value="${line#*=}"
+    case "$value" in
+      \"*\") value="${value#\"}"; value="${value%\"}" ;;
+      \'*\') value="${value#\'}"; value="${value%\'}" ;;
+    esac
+    [ "$only_name" = 0 ] || [ "$key" = PROJECT_NAME ] \
+      || die "$file: only PROJECT_NAME belongs here, not '$key'"
+    case "$key" in
+      PROJECT_NAME | NODE_MAJOR | WITH_RUBY | RUBY_VERSION | WITH_PLAYWRIGHT | \
+      PLAYWRIGHT_VERSION | WITH_PY_REQS | PORTS | EXTRA_ALLOWED_DOMAINS | MOUNT_DOTFILES)
+        printf -v "$key" '%s' "$value" ;;
+      *) die "$file: unknown key '$key'" ;;
+    esac
+  done < "$file"
+}
+
 KIT_ENV=.devcontainer/kit.env
 [ -f "$KIT_ENV" ] || die "$KIT_ENV is missing"
-while IFS= read -r line || [ -n "$line" ]; do
-  line="${line%%#*}"
-  line="${line#"${line%%[![:space:]]*}"}"
-  line="${line%"${line##*[![:space:]]}"}"
-  [ -z "$line" ] && continue
-  case "$line" in
-    *=*) ;;
-    *) die "$KIT_ENV: '$line' is not KEY=value" ;;
-  esac
-  key="${line%%=*}"
-  value="${line#*=}"
-  case "$value" in
-    \"*\") value="${value#\"}"; value="${value%\"}" ;;
-    \'*\') value="${value#\'}"; value="${value%\'}" ;;
-  esac
-  case "$key" in
-    PROJECT_NAME | NODE_MAJOR | WITH_RUBY | RUBY_VERSION | WITH_PLAYWRIGHT | \
-    PLAYWRIGHT_VERSION | WITH_PY_REQS | PORTS | EXTRA_ALLOWED_DOMAINS | MOUNT_DOTFILES)
-      printf -v "$key" '%s' "$value" ;;
-    *) die "$KIT_ENV: unknown key '$key'" ;;
-  esac
-done < "$KIT_ENV"
+read_kit_file "$KIT_ENV" 0
+# Gitignored, so a template can commit PROJECT_NAME=changeme while its own
+# checkout builds under a real name.
+KIT_LOCAL_ENV=.devcontainer/kit.local.env
+[ ! -f "$KIT_LOCAL_ENV" ] || read_kit_file "$KIT_LOCAL_ENV" 1
 
 [[ "$PROJECT_NAME" =~ ^[a-z0-9][a-z0-9_.-]*$ ]] \
   || die "PROJECT_NAME '$PROJECT_NAME' must be lowercase letters, digits, . _ -"
 [ "$PROJECT_NAME" != changeme ] \
-  || die "set a PROJECT_NAME first: python3 .devcontainer/set-project-name.py <name>"
+  || die "set a PROJECT_NAME first: python3 .devcontainer/set-project-name.py <name>, or in $KIT_LOCAL_ENV"
 for flag in WITH_RUBY WITH_PLAYWRIGHT WITH_PY_REQS MOUNT_DOTFILES; do
   [[ "${!flag}" =~ ^[01]$ ]] || die "$flag must be 0 or 1, not '${!flag}'"
 done

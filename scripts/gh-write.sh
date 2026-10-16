@@ -8,7 +8,7 @@
 #   sh scripts/gh-write.sh pr-body   <repo> <number> tmp/<body>.md
 #   sh scripts/gh-write.sh comment   <repo> <number> tmp/<body>.md
 #
-# <repo> is a bare name from GH_REPOS in scripts/github.conf. A PR's base is
+# <repo> is a bare name from GH_REPOS in the GitHub config. A PR's base is
 # always main and its head never is. `comment` takes an issue or PR number.
 #
 # It cannot merge, approve, close, delete, change a title or state, or touch
