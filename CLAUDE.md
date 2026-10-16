@@ -14,6 +14,10 @@ is the only enforcement.
 - **Scratch files go in this project's `tmp/`** (gitignored), never the system
   `/tmp`, never `~`.
 - <Project build / test / serve commands go here.>
+- **Serving for me to look at:** read `PORTS` in `.devcontainer/kit.env`
+  (`host:container` pairs), listen on `0.0.0.0:<container port>`, and give me
+  `http://localhost:<host port>/`, plus the `baseurl` from `_config.yml` for a
+  Jekyll site. No pair in `PORTS` means I can't reach it: ask me to add one.
 - Visual checks (Playwright on): `node tools/dev/shoot.js <base-url> <label>
   [--scheme dark] [--click <text>] <path>...` writes `tmp/shots/`, and
   `node tools/dev/slice-png.js tmp/shots/<file>.png` cuts a tall one. Use these
