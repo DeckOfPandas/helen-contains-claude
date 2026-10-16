@@ -24,6 +24,8 @@
       "Bash(sh scripts/git-push-agent.sh *)",
       "Bash(sh scripts/git-fetch-agent.sh *)",
       "Bash(sh scripts/git-clone-agent.sh *)",
+      "Bash(node tools/dev/shoot.js *)",
+      "Bash(node tools/dev/slice-png.js *)",
       "Bash(sh scripts/gh-read.sh *)",
       "Bash(sh scripts/gh-write.sh *)",
       "Bash(sh scripts/github-public-status.sh *)",

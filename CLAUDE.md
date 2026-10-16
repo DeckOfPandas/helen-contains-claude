@@ -14,6 +14,10 @@ is the only enforcement.
 - **Scratch files go in this project's `tmp/`** (gitignored), never the system
   `/tmp`, never `~`.
 - <Project build / test / serve commands go here.>
+- Visual checks (Playwright on): `node tools/dev/shoot.js <base-url> <label>
+  [--scheme dark] [--click <text>] <path>...` writes `tmp/shots/`, and
+  `node tools/dev/slice-png.js tmp/shots/<file>.png` cuts a tall one. Use these
+  rather than writing new ones in `tmp/`.
 - Reads outside the working directory are refused, except `/opt` and other
   agents' worktrees. Use `/dev/null` only as a redirection (`> /dev/null`,
   `2>/dev/null`, `< /dev/null`), which is never checked. As a command argument

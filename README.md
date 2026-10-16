@@ -31,6 +31,9 @@ scripts/
                          owner, repos, bot account, the wrappers' whole world
   gh-*.sh, git-*-agent.sh, git-fetch-main.sh, github-public-status.sh
   git-diff-main-checkout.sh  the main checkout's uncommitted changes, from a worktree
+tools/dev/
+  shoot.js               full-page screenshots, phone and desktop, light or dark
+  slice-png.js           cuts a tall screenshot into readable pieces
 CLAUDE.md                rules starter: fill in <PROJECT> and the build commands
 tests/kit/               tests for the wrappers, hooks, stamp and config
 ```
