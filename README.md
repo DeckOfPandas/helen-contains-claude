@@ -1,8 +1,8 @@
-# Claude Code project kit
+# Helen Contains Claude: 
 
-A template repository for a project running Claude Code working inside Docker.
+This template repository is a Claude Code in Docker quickstart kit. 
 
-Only the project folder is mounted (at `/workspace`), so Claude cannot read anything else on the host. There are also guard hooks for scary commands, an agent-account GitHub workflow, and a `CLAUDE.md` starter.
+Only the project folder is mounted (at `/workspace`), so Claude can't read anything else on the host. There are also guard hooks for scary commands, an agent-account GitHub workflow, and a `CLAUDE.md` starter.
 
 There are easy togglable options for toolchains to include in the Docoker image. 
 
@@ -54,13 +54,12 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 
 3. **GitHub agent account** (skip this step if Claude won't push):
    - Create a separate GitHub account for the bot. Invite it as a
-     collaborator on just the repos it should touch.
+     collaborator on just the repos you want it to work in.
    - Create it a classic PAT scoped to `repo`, and `workflow` if it
      should edit `.github/workflows/`.
    - Paste the token in `.claude/settings.local.json`, which is gitignored. A
      fresh project doesn't have that file yet, so copy the committed example
-     into place first, then paste the token between the quotes. `run.sh` reads the token for each `docker run` and never prints it. An
-     empty value means no token, and the container starts without one.
+     into place first, then paste the token between the quotes and rename the file to settings.local.json. `run.sh` reads the token for each `docker run` and never prints it. An empty value means no token, and the container starts without one.
    - Fill in `scripts/github.conf`: `GH_OWNER`, `GH_REPOS` (the first is the
      default), `GH_AGENT_USER`, and `MAIN_PUSH_REPOS` if any repo may take
      direct pushes to `main`.
@@ -77,7 +76,7 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 
    The first build takes a few minutes after you change anything.
 
-   On Windows, you probably need to set execute permissions for the script:
+   On Windows, you probably need to set execute permissions for the script before it will run:
        `chmod u+x .devcontainer/run.sh`
 
 
