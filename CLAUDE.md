@@ -11,7 +11,13 @@ is the only enforcement.
 - **Scratch files go in this project's `tmp/`** (gitignored), never the system
   `/tmp`, never `~`.
 - <Project build / test / serve commands go here.>
-- You can read from /opt, and other agents' worktrees, but otherwise you cannot read from outseid your working folder. cd commands starting / will be denied.
+- Reads outside the working directory are refused, except `/opt` and other
+  agents' worktrees.
+- **Paths are relative to the working directory.** No leading `cd`, no
+  `git -C`, no absolute paths into the project.
+- **One plain command per Bash call.** Anything that needs a loop, a chain, or
+  a variable or `$(...)` expanded into a command goes in a script in `tmp/`
+  with every argument written out literally, run as `sh tmp/<name>.sh`.
 
 ## Critical restrictions
 - NEVER run `rm -rf` outside `tmp/` without asking me first.
