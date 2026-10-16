@@ -159,6 +159,39 @@ def test_comment(project):
     assert "repos/acme/drafts/issues/12/comments" in out
 
 
+def test_issue_create(project):
+    out = ok(run(project, "gh-write.sh", "issue-create", "site", "A title", "tmp/body.md"))
+    assert "repos/acme/site/issues" in out and "title=A title" in out and "body=@tmp/body.md" in out
+    assert not any(line.startswith("labels") for line in out)
+
+
+def test_issue_create_with_a_label(project):
+    out = ok(run(project, "gh-write.sh", "issue-create", "site", "T", "tmp/body.md", "parked"))
+    assert "labels[]=parked" in out
+
+
+def test_label_create(project):
+    out = ok(run(project, "gh-write.sh", "label-create", "drafts", "parked", "9a9a9a"))
+    assert "repos/acme/drafts/labels" in out and "name=parked" in out and "color=9a9a9a" in out
+
+
+@pytest.mark.parametrize("args", [
+    ["issue-create", "other", "T", "tmp/body.md"],
+    ["issue-create", "site", "", "tmp/body.md"],
+    ["issue-create", "site", "T", "body.md"],
+    ["issue-create", "site", "T", "tmp/body.md", "two words"],
+    ["issue-create", "site", "T", "tmp/body.md", "-x"],
+    ["issue-create", "site", "T", "tmp/body.md", "a", "b"],
+    ["label-create", "site", "parked", "#9a9a9a"],
+    ["label-create", "site", "parked", "9a9a9"],
+    ["label-create", "site", "parked", "gggggg"],
+    ["label-create", "site", "a;b", "9a9a9a"],
+    ["label-create", "other", "parked", "9a9a9a"],
+])
+def test_issue_and_label_refusals(project, args):
+    assert refused(run(project, "gh-write.sh", *args))
+
+
 # --- public status --------------------------------------------------------------
 
 @pytest.mark.parametrize("url", ["https://github.com/acme/site/pull/1", "https://github.com/acme-bot"])

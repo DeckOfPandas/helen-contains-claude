@@ -1,15 +1,19 @@
 #!/bin/sh
-# The three GitHub writes a session makes routinely, each checked. It builds
-# the `gh api` call itself and accepts nothing it does not understand, which is
+# The GitHub writes a session makes routinely, each checked. It builds the
+# `gh api` call itself and accepts nothing it does not understand, which is
 # why .claude/settings.json can allow it unasked.
 #
-# USAGE -- the body is always a file under tmp/, written with the Write tool:
-#   sh scripts/gh-write.sh pr-create <repo> <branch> "<title>" tmp/<body>.md
-#   sh scripts/gh-write.sh pr-body   <repo> <number> tmp/<body>.md
-#   sh scripts/gh-write.sh comment   <repo> <number> tmp/<body>.md
+# USAGE -- a body is always a file under tmp/, written with the Write tool:
+#   sh scripts/gh-write.sh pr-create    <repo> <branch> "<title>" tmp/<body>.md
+#   sh scripts/gh-write.sh pr-body      <repo> <number> tmp/<body>.md
+#   sh scripts/gh-write.sh comment      <repo> <number> tmp/<body>.md
+#   sh scripts/gh-write.sh issue-create <repo> "<title>" tmp/<body>.md [<label>]
+#   sh scripts/gh-write.sh label-create <repo> <label> <rrggbb>
 #
 # <repo> is a bare name from GH_REPOS in the GitHub config. A PR's base is
-# always main and its head never is. `comment` takes an issue or PR number.
+# always main and its head never is. `comment` takes an issue or PR number. A
+# label is letters, digits, dots, dashes and underscores; a colour is six hex
+# digits with no #. One label per issue, and never issues in a burst.
 #
 # It cannot merge, approve, close, delete, change a title or state, or touch
 # settings. Prints the login GitHub recorded, so the author is read, not assumed.
@@ -20,7 +24,20 @@ here="$(cd "$(dirname "$0")" && pwd)"
 . "$here/_github_conf.sh"
 load_conf
 
-usage="usage: sh scripts/gh-write.sh pr-create <repo> <branch> \"<title>\" tmp/<body>.md | pr-body <repo> <number> tmp/<body>.md | comment <repo> <number> tmp/<body>.md"
+usage="usage: sh scripts/gh-write.sh pr-create <repo> <branch> \"<title>\" tmp/<body>.md | pr-body <repo> <number> tmp/<body>.md | comment <repo> <number> tmp/<body>.md | issue-create <repo> \"<title>\" tmp/<body>.md [<label>] | label-create <repo> <label> <rrggbb>"
+
+check_label() {
+  case "$1" in
+    '' | -* | *[!A-Za-z0-9._-]*) refuse "'$1' is not a plain label name" ;;
+  esac
+}
+
+check_colour() {
+  case "$1" in
+    [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) ;;
+    *) refuse "'$1' is not six hex digits" ;;
+  esac
+}
 
 check_number() {
   case "$1" in
@@ -81,6 +98,31 @@ case "$action" in
     set -- sh "$here/gh-agent.sh" api --method POST "repos/$GH_OWNER/$1/issues/$2/comments" \
       -F "body=@$3" \
       --jq '[.html_url, .user.login] | @tsv'
+    ;;
+  issue-create)
+    [ "$#" -eq 3 ] || [ "$#" -eq 4 ] || refuse "$usage"
+    check_repo "$1"
+    [ -n "$2" ] || refuse "an issue needs a title"
+    check_body "$3"
+    if [ "$#" -eq 4 ]; then
+      check_label "$4"
+      set -- sh "$here/gh-agent.sh" api --method POST "repos/$GH_OWNER/$1/issues" \
+        -f "title=$2" -F "body=@$3" -f "labels[]=$4" \
+        --jq '[.number, .html_url, .user.login] | @tsv'
+    else
+      set -- sh "$here/gh-agent.sh" api --method POST "repos/$GH_OWNER/$1/issues" \
+        -f "title=$2" -F "body=@$3" \
+        --jq '[.number, .html_url, .user.login] | @tsv'
+    fi
+    ;;
+  label-create)
+    [ "$#" -eq 3 ] || refuse "$usage"
+    check_repo "$1"
+    check_label "$2"
+    check_colour "$3"
+    set -- sh "$here/gh-agent.sh" api --method POST "repos/$GH_OWNER/$1/labels" \
+      -f "name=$2" -f "color=$3" \
+      --jq '[.name, .color] | @tsv'
     ;;
   *)
     refuse "'$action' is not a write this wrapper makes. $usage"
