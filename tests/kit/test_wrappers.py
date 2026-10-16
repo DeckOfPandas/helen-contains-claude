@@ -253,11 +253,13 @@ def test_credential_helper(project):
     done = subprocess.run(
         ["sh", str(project / "scripts" / "git-credential-agent-token.sh"), "get"],
         cwd=project, capture_output=True, text=True,
-        env={"PATH": "/usr/bin:/bin", "AGENT_GH_TOKEN": "not-a-real-token"},
+        env={"PATH": "/usr/bin:/bin", "AGENT_GH_TOKEN": "not-a-real-token",
+             "GIT_CEILING_DIRECTORIES": str(project.parent)},
     )
     assert done.stdout.splitlines() == ["username=acme-bot", "password=not-a-real-token"]
     store = subprocess.run(
         ["sh", str(project / "scripts" / "git-credential-agent-token.sh"), "store"],
-        cwd=project, capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"},
+        cwd=project, capture_output=True, text=True,
+        env={"PATH": "/usr/bin:/bin", "GIT_CEILING_DIRECTORIES": str(project.parent)},
     )
     assert store.stdout == ""
