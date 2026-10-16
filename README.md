@@ -25,7 +25,7 @@ There are easy togglable options for toolchains to include in the Docoker image.
   set-project-name.py    sets PROJECT_NAME in kit.env and devcontainer.json
 .claude/
   settings.json          permissions + hooks
-  hooks/                 guards (see .claude/hooks/README.md); strict/ is opt-in
+  hooks/                 guards (see .claude/hooks/README.md)
 scripts/
   github.conf            placeholder template for github.local.conf (gitignored):
                          owner, repos, bot account, the wrappers' whole world

@@ -92,6 +92,30 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-token-expansion.py\"",
             "timeout": 20,
             "statusMessage": "Checking for token exposure"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-unanalyzable-bash.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking the command can be analysed"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-inline-script.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking for inline programs"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-sed.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking for sed"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-awk.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking for awk"
           }
         ]
       }

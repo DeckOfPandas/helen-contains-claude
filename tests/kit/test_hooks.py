@@ -127,7 +127,7 @@ def test_ground_truth_reports_branch(hooks, repo):
     assert "sandbox:" in report and "tree: clean" in report
 
 
-# --- strict --------------------------------------------------------------------------------
+# --- analysable commands, sed, awk, inline programs ------------------------------------------
 
 @pytest.mark.parametrize("hook,command", [
     ("guard-sed.py", "sed -i s/a/b/ f"),
@@ -144,9 +144,14 @@ def test_ground_truth_reports_branch(hooks, repo):
     ("guard-unanalyzable-bash.py", "FOO=1 ls"),
     ("guard-unanalyzable-bash.py", "ls *.md"),
     ("guard-unanalyzable-bash.py", "cat <<EOF"),
+    ("guard-unanalyzable-bash.py", "a || b"),
+    ("guard-unanalyzable-bash.py", "curl https://x/y?a=1&b=2"),
+    ("guard-unanalyzable-bash.py", "(cd x)"),
+    ("guard-unanalyzable-bash.py", "sh scripts/gh-read.sh repos/o/r --jq '[.a] | @tsv'"),
+    ("guard-unanalyzable-bash.py", 'grep "$[a]" f'),
 ])
-def test_strict_refusals(hooks, tmp_path, hook, command):
-    assert denied(run_hook(hooks / "strict" / hook, command, tmp_path))
+def test_guard_refusals(hooks, tmp_path, hook, command):
+    assert denied(run_hook(hooks / hook, command, tmp_path))
 
 
 @pytest.mark.parametrize("hook,command", [
@@ -159,6 +164,15 @@ def test_strict_refusals(hooks, tmp_path, hook, command):
     ("guard-unanalyzable-bash.py", "grep 'a|b' f"),
     ("guard-unanalyzable-bash.py", "git -c credential.helper=x push"),
     ("guard-unanalyzable-bash.py", "echo '$(not run)'"),
+    ("guard-unanalyzable-bash.py", "python3 -m json.tool f > /dev/null"),
+    ("guard-unanalyzable-bash.py", "sh scripts/gh-read.sh 'repos/o/r?a=1&b=2' --fields a,b"),
 ])
-def test_strict_passes(hooks, tmp_path, hook, command):
-    assert not denied(run_hook(hooks / "strict" / hook, command, tmp_path))
+def test_guard_passes(hooks, tmp_path, hook, command):
+    assert not denied(run_hook(hooks / hook, command, tmp_path))
+
+
+def test_cd_and_git_dash_c_refusals_say_what_to_do_instead(hooks, tmp_path):
+    for command in ("cd /workspace", "git -C ../.. diff"):
+        reason = run_hook(hooks / "guard-unanalyzable-bash.py", command, tmp_path)[
+            "hookSpecificOutput"]["permissionDecisionReason"]
+        assert "scripts/" in reason and "validated arguments" in reason, command

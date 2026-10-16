@@ -24,9 +24,17 @@ is the only enforcement.
   it is a read outside and asks me.
 - **Paths are relative to the working directory.** No leading `cd`, no
   `git -C`, no absolute paths into the project.
-- **One plain command per Bash call.** Anything that needs a loop, a chain, or
-  a variable or `$(...)` expanded into a command goes in a script in `tmp/`
-  with every argument written out literally, run as `sh tmp/<name>.sh`.
+- **One plain command per Bash call.** Anything that needs a loop, a chain, a
+  pipe, or a variable or `$(...)` expanded into a command goes in a script in
+  `tmp/` with every argument written out literally, run as `sh tmp/<name>.sh`.
+  Programs go in files too: never `python3 -c` or `node -e`.
+  `guard-unanalyzable-bash.py` and `guard-inline-script.py` enforce it.
+- **Never `sed` or `awk`**, in any form. Use the Edit tool, or Python in a
+  file. `guard-sed.py` and `guard-awk.py` enforce it.
+- **A command that must reach outside the working directory becomes a script
+  in `scripts/`** with one fixed action and validated arguments, its safety
+  stated in its header, and dry-run tests. Ask me before allowing it in
+  `.claude/settings.json`. `scripts/git-diff-main-checkout.sh` is the model.
 
 ## Critical restrictions
 - NEVER run `rm -rf` outside `tmp/` without asking me first.
