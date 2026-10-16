@@ -29,6 +29,9 @@ is the only enforcement.
 - NEVER alter shell dotfiles or system configuration.
 
 ## Git workflow
+- A new worktree starts from the current HEAD (`worktree.baseRef` in
+  `.claude/settings.json`), not `origin/main`. If one lacks work you expect,
+  `git merge --ff-only <branch>`.
 - **Never commit or merge on `main`**, in any repo in the tree.
   `guard-main-branch.py` enforces it. Starting new work on `main`? Branch first.
 - **Check `git branch --show-current` in its own tool call immediately before
