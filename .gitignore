@@ -4,4 +4,6 @@ tmp/
 .env.*
 __pycache__/
 .pytest_cache/
-.claude/worktrees
+.claude/worktrees/
+scripts/github.local.conf
+.devcontainer/kit.local.env

@@ -24,6 +24,7 @@ MAIN_PUSH_REPOS=drafts
 @pytest.fixture
 def project(tmp_path: Path, kit_root: Path) -> Path:
     shutil.copytree(kit_root / "scripts", tmp_path / "scripts")
+    (tmp_path / "scripts" / "github.local.conf").unlink(missing_ok=True)
     (tmp_path / "scripts" / "github.conf").write_text(CONF)
     (tmp_path / "tmp").mkdir()
     (tmp_path / "tmp" / "body.md").write_text("hello\n")
@@ -36,8 +37,10 @@ def run(project: Path, script: str, *args: str, conf: str | None = None):
     return subprocess.run(
         ["sh", f"scripts/{script}", *args],
         cwd=project, capture_output=True, text=True, timeout=30,
+        # The ceiling stops git finding the kit's own checkout above the copy,
+        # whose github.local.conf would otherwise be read.
         env={"PATH": "/usr/local/bin:/usr/bin:/bin", "AGENT_WRAPPER_DRY_RUN": "1",
-             "AGENT_GH_TOKEN": "not-a-real-token"},
+             "AGENT_GH_TOKEN": "not-a-real-token", "GIT_CEILING_DIRECTORIES": str(project.parent)},
     )
 
 
@@ -156,6 +159,39 @@ def test_comment(project):
     assert "repos/acme/drafts/issues/12/comments" in out
 
 
+def test_issue_create(project):
+    out = ok(run(project, "gh-write.sh", "issue-create", "site", "A title", "tmp/body.md"))
+    assert "repos/acme/site/issues" in out and "title=A title" in out and "body=@tmp/body.md" in out
+    assert not any(line.startswith("labels") for line in out)
+
+
+def test_issue_create_with_a_label(project):
+    out = ok(run(project, "gh-write.sh", "issue-create", "site", "T", "tmp/body.md", "parked"))
+    assert "labels[]=parked" in out
+
+
+def test_label_create(project):
+    out = ok(run(project, "gh-write.sh", "label-create", "drafts", "parked", "9a9a9a"))
+    assert "repos/acme/drafts/labels" in out and "name=parked" in out and "color=9a9a9a" in out
+
+
+@pytest.mark.parametrize("args", [
+    ["issue-create", "other", "T", "tmp/body.md"],
+    ["issue-create", "site", "", "tmp/body.md"],
+    ["issue-create", "site", "T", "body.md"],
+    ["issue-create", "site", "T", "tmp/body.md", "two words"],
+    ["issue-create", "site", "T", "tmp/body.md", "-x"],
+    ["issue-create", "site", "T", "tmp/body.md", "a", "b"],
+    ["label-create", "site", "parked", "#9a9a9a"],
+    ["label-create", "site", "parked", "9a9a9"],
+    ["label-create", "site", "parked", "gggggg"],
+    ["label-create", "site", "a;b", "9a9a9a"],
+    ["label-create", "other", "parked", "9a9a9a"],
+])
+def test_issue_and_label_refusals(project, args):
+    assert refused(run(project, "gh-write.sh", *args))
+
+
 # --- public status --------------------------------------------------------------
 
 @pytest.mark.parametrize("url", ["https://github.com/acme/site/pull/1", "https://github.com/acme-bot"])
@@ -189,15 +225,41 @@ def test_shipped_config_is_the_placeholder(kit_root, project):
     assert refused(result) and "placeholder" in result.stderr
 
 
+def test_local_config_replaces_the_committed_one(project):
+    shipped = "GH_OWNER=your-org\nGH_REPOS=a\nGH_AGENT_USER=b\n"
+    (project / "scripts" / "github.local.conf").write_text(CONF)
+    out = ok(run(project, "git-fetch-main.sh", conf=shipped))
+    assert "https://github.com/acme/site.git" in out
+
+
+def test_a_worktree_reads_the_main_checkouts_local_config(tmp_path, kit_root):
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+    main = tmp_path / "main"
+    shutil.copytree(kit_root / "scripts", main / "scripts")
+    (main / "scripts" / "github.conf").write_text("GH_OWNER=your-org\nGH_REPOS=a\nGH_AGENT_USER=b\n")
+    (main / "scripts" / "github.local.conf").unlink(missing_ok=True)
+    (main / ".gitignore").write_text("scripts/github.local.conf\n")
+    subprocess.run([*git, "init", "-q"], cwd=main, check=True)
+    subprocess.run([*git, "add", "."], cwd=main, check=True)
+    subprocess.run([*git, "commit", "-qm", "x"], cwd=main, check=True)
+    subprocess.run([*git, "worktree", "add", "-q", str(main / "wt")], cwd=main, check=True)
+    (main / "scripts" / "github.local.conf").write_text(CONF)
+    assert not (main / "wt" / "scripts" / "github.local.conf").exists()
+    out = ok(run(main / "wt", "git-fetch-main.sh"))
+    assert "https://github.com/acme/site.git" in out
+
+
 def test_credential_helper(project):
     done = subprocess.run(
         ["sh", str(project / "scripts" / "git-credential-agent-token.sh"), "get"],
         cwd=project, capture_output=True, text=True,
-        env={"PATH": "/usr/bin:/bin", "AGENT_GH_TOKEN": "not-a-real-token"},
+        env={"PATH": "/usr/bin:/bin", "AGENT_GH_TOKEN": "not-a-real-token",
+             "GIT_CEILING_DIRECTORIES": str(project.parent)},
     )
     assert done.stdout.splitlines() == ["username=acme-bot", "password=not-a-real-token"]
     store = subprocess.run(
         ["sh", str(project / "scripts" / "git-credential-agent-token.sh"), "store"],
-        cwd=project, capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"},
+        cwd=project, capture_output=True, text=True,
+        env={"PATH": "/usr/bin:/bin", "GIT_CEILING_DIRECTORIES": str(project.parent)},
     )
     assert store.stdout == ""

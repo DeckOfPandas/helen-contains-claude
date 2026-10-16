@@ -8,6 +8,8 @@
 # stamp covers, and a missed rebuild is the failure the stamp exists to prevent.
 run.sh
 kit.env
+kit.local.env
+kit.local.example.env
 devcontainer.json
 project.bashrc
 build_inputs_hash.py

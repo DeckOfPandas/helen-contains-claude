@@ -16,6 +16,11 @@
 # MAIN_PUSH_REPOS; a refspec with no colon, since a bare name or HEAD pushes to
 # whatever is checked out; one starting `-`; a repo outside GH_REPOS; and a
 # `dir` that is absolute, contains `..` or starts `-`.
+#
+# GitHub itself refuses a push that adds or changes a file under
+# .github/workflows/ unless the token has the `workflow` scope (README.md,
+# "GitHub agent account"). The refusal names the scope; the fix is a new token,
+# not a retry.
 set -eu
 
 WRAPPER=git-push-agent.sh
@@ -41,7 +46,7 @@ case "$destination" in
   main | */main | master | */master)
     # shellcheck disable=SC2086
     in_list "$repo" $MAIN_PUSH_REPOS \
-      || refuse "that pushes to $repo's $destination, which only moves by a merged PR (MAIN_PUSH_REPOS in scripts/github.conf)" ;;
+      || refuse "that pushes to $repo's $destination, which only moves by a merged PR (MAIN_PUSH_REPOS in $conf_name)" ;;
 esac
 
 run_or_print git -C "$dir" \

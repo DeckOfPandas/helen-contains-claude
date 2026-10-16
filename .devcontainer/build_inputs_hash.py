@@ -10,7 +10,10 @@ to the image that already matches.
 `!` or `?` makes this hash the whole directory instead, with a note on stderr:
 a spurious cached rebuild is harmless, and a missed rebuild is the bug.
 
-Run from the repo root. Prints the hash and nothing else on stdout.
+USAGE:  python3 build_inputs_hash.py [<build args> [<context dir>]]
+
+The context defaults to .devcontainer, relative to the current directory.
+Prints the hash and nothing else on stdout.
 """
 from __future__ import annotations
 
@@ -61,4 +64,7 @@ def build_inputs_hash(context: Path = CONTEXT, build_args: str = "") -> str:
 
 
 if __name__ == "__main__":
-    print(build_inputs_hash(build_args=sys.argv[1] if len(sys.argv) > 1 else ""))
+    print(build_inputs_hash(
+        context=Path(sys.argv[2]) if len(sys.argv) > 2 else CONTEXT,
+        build_args=sys.argv[1] if len(sys.argv) > 1 else "",
+    ))

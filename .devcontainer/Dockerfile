@@ -74,7 +74,10 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright/ms-playwright
 ENV NODE_PATH=/opt/playwright/node_modules
 
 # --break-system-packages is safe in a single-purpose image: nothing else
-# depends on this Python.
+# depends on this Python. pytest is always here because tests/kit/ ships in
+# every project made from the kit.
+RUN pip install --break-system-packages --no-cache-dir "pytest==9.1.1"
+
 ARG WITH_PY_REQS=0
 COPY requirements.txt /usr/local/share/claude-kit/requirements.txt
 RUN if [ "$WITH_PY_REQS" = 1 ]; then \

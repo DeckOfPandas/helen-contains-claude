@@ -12,6 +12,7 @@ There are easy togglable options for toolchains to include in the Docoker image.
 .devcontainer/
   run.sh                 build-if-stale, then start the container
   kit.env                toggles: what goes in the image, ports, firewall extras
+  kit.local.example.env  a name kept out of git (see "Working on the kit itself")
   Dockerfile             the image; every toggle is a build argument
   init-firewall.sh       optional default-deny egress allowlist
   requirements.txt       pip installs, when WITH_PY_REQS=1
@@ -24,10 +25,15 @@ There are easy togglable options for toolchains to include in the Docoker image.
   set-project-name.py    sets PROJECT_NAME in kit.env and devcontainer.json
 .claude/
   settings.json          permissions + hooks
-  hooks/                 guards (see .claude/hooks/README.md); strict/ is opt-in
+  hooks/                 guards (see .claude/hooks/README.md)
 scripts/
-  github.conf            owner, repos, bot account: the wrappers' whole world
+  github.conf            placeholder template for github.local.conf (gitignored):
+                         owner, repos, bot account, the wrappers' whole world
   gh-*.sh, git-*-agent.sh, git-fetch-main.sh, github-public-status.sh
+  git-diff-main-checkout.sh  the main checkout's uncommitted changes, from a worktree
+tools/dev/
+  shoot.js               full-page screenshots, phone and desktop, light or dark
+  slice-png.js           cuts a tall screenshot into readable pieces
 CLAUDE.md                rules starter: fill in <PROJECT> and the build commands
 tests/kit/               tests for the wrappers, hooks, stamp and config
 ```
@@ -44,10 +50,10 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 
    | Toggle | Adds |
    |---|---|
-   | *(always)* | Debian bookworm, git, curl, jq, Python 3, Node, `gh`, Claude Code |
+   | *(always)* | Debian bookworm, git, curl, jq, Python 3, pytest, Node, `gh`, Claude Code |
    | `WITH_RUBY=1` | Ruby `RUBY_VERSION` (base becomes `ruby:<v>-slim-bookworm`), build headers, a persistent bundle cache |
    | `WITH_PLAYWRIGHT=1` | Playwright `PLAYWRIGHT_VERSION` + headless Chromium under `/opt/playwright`, npm and pip bindings |
-   | `WITH_PY_REQS=1` | `pip install -r .devcontainer/requirements.txt` |
+   | `WITH_PY_REQS=1` | `pip install -r .devcontainer/requirements.txt`: PyYAML and Pillow, plus whatever you add |
 
    Also in `kit.env`: `PORTS` (e.g. `"5000:5000 5001:5001"`), `EXTRA_ALLOWED_DOMAINS`
    for the firewall, and `MOUNT_DOTFILES`.
@@ -56,13 +62,22 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
    - Create a separate GitHub account for the bot. Invite it as a
      collaborator on just the repos you want it to work in.
    - Create it a classic PAT scoped to `repo`, and `workflow` if it
-     should edit `.github/workflows/`.
+     should edit `.github/workflows/`: without it, GitHub refuses any push
+     that touches a workflow file, and `git-push-agent.sh` says so.
    - Paste the token in `.claude/settings.local.json`, which is gitignored. A
      fresh project doesn't have that file yet, so copy the committed example
-     into place first, then paste the token between the quotes and rename the file to settings.local.json. `run.sh` reads the token for each `docker run` and never prints it. An empty value means no token, and the container starts without one.
-   - Fill in `scripts/github.conf`: `GH_OWNER`, `GH_REPOS` (the first is the
-     default), `GH_AGENT_USER`, and `MAIN_PUSH_REPOS` if any repo may take
-     direct pushes to `main`.
+     to it, leaving the example in place, then paste the token between the
+     quotes:
+
+         cp .claude/settings.local.example.json .claude/settings.local.json
+
+     `run.sh` reads the token for each `docker run` and never prints it. An
+     empty value means no token, and the container starts without one.
+   - Copy `scripts/github.conf` to `scripts/github.local.conf` (gitignored)
+     and fill that in: `GH_OWNER`, `GH_REPOS` (the first is the default),
+     `GH_AGENT_USER`, and `MAIN_PUSH_REPOS` if any repo may take direct
+     pushes to `main`. The wrappers read the local copy; from a worktree, they
+     read the main checkout's.
    - Optionally, protect `main` with a ruleset as well. The wrappers refuse
      to push there, but a ruleset is a belt for the braces.
 
@@ -84,6 +99,13 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 
 `claude`, then do the Claude login thing.
 
+### First deploy
+
+A GitHub Pages workflow (for example Jekyll's) builds but publishes nothing
+until you set the repository's **Settings → Pages → Source** to **GitHub
+Actions**. That is a repository setting, which the agent must not change, so
+it is yours to do once.
+
 ## Using it
 
 - `bash .devcontainer/run.sh` starts the container. `--rebuild` rebuilds from
@@ -91,8 +113,12 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 - **One container per project.** The fixed container name refuses a second
   `run.sh`, so two Claudes never edit one working tree. To run several
   sessions at once, use git worktrees inside the one container.
-- Run `run.sh` from inside a worktree and it still mounts the primary clone,
-  so all worktrees share one container.
+- `run.sh` always mounts the primary clone, so all worktrees share one
+  container. It builds from the `.devcontainer/` it sits in, so to try a
+  branch's `kit.env` or Dockerfile before it is merged, run that worktree's
+  copy from the host:
+
+      bash .claude/worktrees/<name>/.devcontainer/run.sh
 - `.devcontainer/project.bashrc` holds project aliases. It is read from the
   mount at shell start, so edits don't need a rebuild. A server must listen on
   `0.0.0.0` to be reachable through a published port.
@@ -147,10 +173,26 @@ token ends up printed.
 escape. The threat model is an honest mistake. Also, the token is in the
 container's environment: the hooks make printing it hard, not impossible.
 
+## Working on the kit itself
+
+The kit is a template, so what it commits is what every new project starts
+from. Keep the committed copies as placeholders (`PROJECT_NAME=changeme`,
+`your-org`, `<PROJECT>`) and put your own values in the gitignored local files:
+
+    cp .devcontainer/kit.local.example.env .devcontainer/kit.local.env   # PROJECT_NAME
+    cp scripts/github.conf scripts/github.local.conf                     # GitHub
+    cp .claude/settings.local.example.json .claude/settings.local.json   # token
+
+`tests/kit/` fails if `scripts/github.conf` holds anything but the
+placeholders. Nothing checks the name or `CLAUDE.md`'s title, because a
+project made from the kit commits its own.
+
 ## Tests
 
     python3 -m pytest
 
 These cover the wrappers' refusals (dry-run, no network), the hooks, the build
-stamp, and that `kit.env` and `devcontainer.json` agree. They need `pytest`;
-put it in `requirements.txt` with `WITH_PY_REQS=1`, or run them on the host.
+stamp, and that `kit.env` and `devcontainer.json` agree. The image always has
+`pytest`, and Claude may run `python3 -m pytest` or `python3 -m pytest -q`
+unasked; anything with more arguments asks, because `--basetemp` empties the
+folder it is given.

@@ -8,7 +8,10 @@
 #   --build-only  build if needed and stop; devcontainer.json runs this
 #   --rebuild     rebuild from scratch, pulling the base image again
 #
-# What goes in the image is .devcontainer/kit.env. See README.md.
+# What goes in the image is the kit.env and Dockerfile beside this script: run
+# a worktree's copy (.claude/worktrees/<name>/.devcontainer/run.sh) to build
+# from that branch. Either way the primary clone is what gets mounted. See
+# README.md.
 set -euo pipefail
 
 die() {
@@ -30,19 +33,27 @@ for arg in "$@"; do
   esac
 done
 if [ "$SHOW_HELP" = 1 ]; then
-  head -n 11 "${BASH_SOURCE[0]}" | tail -n +2
+  head -n 14 "${BASH_SOURCE[0]}" | tail -n +2
   exit 0
 fi
 
 # The primary clone, even when run from inside a worktree: every worktree of a
-# repo shares one container, and the fixed --name below refuses a second.
+# repo shares one container, and the fixed --name below refuses a second. A
+# worktree made inside the container records its git dir as /workspace/.git/...,
+# which the host does not have, so git fails there and the path decides.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if GIT_COMMON_DIR="$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
   REPO_ROOT="$(dirname "$GIT_COMMON_DIR")"
 else
-  REPO_ROOT="$(dirname "$HERE")"
+  case "$HERE" in
+    */.claude/worktrees/*/.devcontainer) REPO_ROOT="${HERE%/.claude/worktrees/*}" ;;
+    *) REPO_ROOT="$(dirname "$HERE")" ;;
+  esac
 fi
 cd "$REPO_ROOT"
+if [ "$HERE" != "$REPO_ROOT/.devcontainer" ]; then
+  echo "run.sh: building from $HERE, mounting $REPO_ROOT"
+fi
 
 [ "$(id -u)" -ne 0 ] || die "run this as your own user, not root: the container user copies your uid"
 command -v docker >/dev/null || die "docker is not on PATH"
@@ -61,35 +72,47 @@ PORTS=""
 EXTRA_ALLOWED_DOMAINS=""
 MOUNT_DOTFILES=1
 
-KIT_ENV=.devcontainer/kit.env
+# read_kit_file <file> <local>: with <local> = 1, only PROJECT_NAME is accepted.
+read_kit_file() {
+  local file="$1" only_name="$2" line key value
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [ -z "$line" ] && continue
+    case "$line" in
+      *=*) ;;
+      *) die "$file: '$line' is not KEY=value" ;;
+    esac
+    key="${line%%=*}"
+    value="${line#*=}"
+    case "$value" in
+      \"*\") value="${value#\"}"; value="${value%\"}" ;;
+      \'*\') value="${value#\'}"; value="${value%\'}" ;;
+    esac
+    [ "$only_name" = 0 ] || [ "$key" = PROJECT_NAME ] \
+      || die "$file: only PROJECT_NAME belongs here, not '$key'"
+    case "$key" in
+      PROJECT_NAME | NODE_MAJOR | WITH_RUBY | RUBY_VERSION | WITH_PLAYWRIGHT | \
+      PLAYWRIGHT_VERSION | WITH_PY_REQS | PORTS | EXTRA_ALLOWED_DOMAINS | MOUNT_DOTFILES)
+        printf -v "$key" '%s' "$value" ;;
+      *) die "$file: unknown key '$key'" ;;
+    esac
+  done < "$file"
+}
+
+KIT_ENV="$HERE/kit.env"
 [ -f "$KIT_ENV" ] || die "$KIT_ENV is missing"
-while IFS= read -r line || [ -n "$line" ]; do
-  line="${line%%#*}"
-  line="${line#"${line%%[![:space:]]*}"}"
-  line="${line%"${line##*[![:space:]]}"}"
-  [ -z "$line" ] && continue
-  case "$line" in
-    *=*) ;;
-    *) die "$KIT_ENV: '$line' is not KEY=value" ;;
-  esac
-  key="${line%%=*}"
-  value="${line#*=}"
-  case "$value" in
-    \"*\") value="${value#\"}"; value="${value%\"}" ;;
-    \'*\') value="${value#\'}"; value="${value%\'}" ;;
-  esac
-  case "$key" in
-    PROJECT_NAME | NODE_MAJOR | WITH_RUBY | RUBY_VERSION | WITH_PLAYWRIGHT | \
-    PLAYWRIGHT_VERSION | WITH_PY_REQS | PORTS | EXTRA_ALLOWED_DOMAINS | MOUNT_DOTFILES)
-      printf -v "$key" '%s' "$value" ;;
-    *) die "$KIT_ENV: unknown key '$key'" ;;
-  esac
-done < "$KIT_ENV"
+read_kit_file "$KIT_ENV" 0
+# Gitignored, so a template can commit PROJECT_NAME=changeme while its own
+# checkout builds under a real name.
+KIT_LOCAL_ENV=.devcontainer/kit.local.env
+[ ! -f "$KIT_LOCAL_ENV" ] || read_kit_file "$KIT_LOCAL_ENV" 1
 
 [[ "$PROJECT_NAME" =~ ^[a-z0-9][a-z0-9_.-]*$ ]] \
   || die "PROJECT_NAME '$PROJECT_NAME' must be lowercase letters, digits, . _ -"
 [ "$PROJECT_NAME" != changeme ] \
-  || die "set a PROJECT_NAME first: python3 .devcontainer/set-project-name.py <name>"
+  || die "set a PROJECT_NAME first: python3 .devcontainer/set-project-name.py <name>, or in $KIT_LOCAL_ENV"
 for flag in WITH_RUBY WITH_PLAYWRIGHT WITH_PY_REQS MOUNT_DOTFILES; do
   [[ "${!flag}" =~ ^[01]$ ]] || die "$flag must be 0 or 1, not '${!flag}'"
 done
@@ -137,11 +160,11 @@ label() {
   printf '%s' "$value"
 }
 
-BUILD_HASH="$(python3 .devcontainer/build_inputs_hash.py "${BUILD_ARGS[*]}")"
+BUILD_HASH="$(python3 "$HERE/build_inputs_hash.py" "${BUILD_ARGS[*]}" "$HERE")"
 IMAGE_HASH="$(label "$STAMP_LABEL")"
 IMAGE_VERSION="$(label "$VERSION_LABEL")"
 # Not knowing the newest version is never a reason to rebuild or to stop.
-CLAUDE_CODE_VERSION="${PIN_CLAUDE_CODE:-$(python3 .devcontainer/claude_code_latest.py || true)}"
+CLAUDE_CODE_VERSION="${PIN_CLAUDE_CODE:-$(python3 "$HERE/claude_code_latest.py" || true)}"
 [ -n "$CLAUDE_CODE_VERSION" ] || CLAUDE_CODE_VERSION="${IMAGE_VERSION:-latest}"
 
 if [ "$REBUILD" = 1 ] || [ "$IMAGE_HASH" != "$BUILD_HASH" ] || [ "$IMAGE_VERSION" != "$CLAUDE_CODE_VERSION" ]; then
@@ -164,7 +187,7 @@ if [ "$REBUILD" = 1 ] || [ "$IMAGE_HASH" != "$BUILD_HASH" ] || [ "$IMAGE_VERSION
     --build-arg "CLAUDE_CODE_VERSION=$CLAUDE_CODE_VERSION" \
     --label "$STAMP_LABEL=$BUILD_HASH" \
     --label "$VERSION_LABEL=$CLAUDE_CODE_VERSION" \
-    -f .devcontainer/Dockerfile .devcontainer
+    -f "$HERE/Dockerfile" "$HERE"
 fi
 
 [ "$BUILD_ONLY" = 1 ] && exit 0

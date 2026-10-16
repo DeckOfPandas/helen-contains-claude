@@ -55,6 +55,15 @@ def test_build_args_exist_in_the_dockerfile_with_kit_env_defaults(kit_root):
         assert args[name].strip('"') == env[name], f"Dockerfile default for {name} differs from kit.env"
 
 
+def test_python_packages_are_pinned(kit_root):
+    dockerfile = (kit_root / ".devcontainer" / "Dockerfile").read_text()
+    assert re.search(r'"pytest==\d+\.\d+\.\d+"', dockerfile), "pytest is not pinned in the Dockerfile"
+    for line in (kit_root / ".devcontainer" / "requirements.txt").read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            assert re.fullmatch(r"[A-Za-z0-9_.-]+==[0-9][A-Za-z0-9.]*", line), f"unpinned: {line}"
+
+
 def test_settings_json_hooks_exist(kit_root):
     settings = json.loads((kit_root / ".claude" / "settings.json").read_text())
     commands = [h["command"] for event in settings["hooks"].values()
@@ -63,6 +72,13 @@ def test_settings_json_hooks_exist(kit_root):
         path = re.search(r"\$CLAUDE_PROJECT_DIR/([^\"]+)", command).group(1)
         assert (kit_root / path).is_file(), path
     assert "Bash(sh scripts/gh-agent.sh pr merge *)" in settings["permissions"]["deny"]
+
+
+def test_playwright_lives_in_an_allowed_directory(kit_root):
+    settings = json.loads((kit_root / ".claude" / "settings.json").read_text())
+    dockerfile = (kit_root / ".devcontainer" / "Dockerfile").read_text()
+    assert "/opt/playwright" in dockerfile
+    assert "/opt" in settings["permissions"]["additionalDirectories"]
 
 
 def test_settings_local_example_is_what_run_sh_reads(tmp_path, kit_root):
@@ -76,13 +92,19 @@ def test_settings_local_example_is_what_run_sh_reads(tmp_path, kit_root):
     assert done.returncode == 0 and done.stdout == ""
 
 
-def test_only_the_example_is_committed(tmp_path, kit_root):
+@pytest.mark.parametrize("local,committed", [
+    (".claude/settings.local.json", ".claude/settings.local.example.json"),
+    ("scripts/github.local.conf", "scripts/github.conf"),
+    (".devcontainer/kit.local.env", ".devcontainer/kit.local.example.env"),
+])
+def test_only_the_template_is_committed(tmp_path, kit_root, local, committed):
     shutil.copy(kit_root / ".gitignore", tmp_path / ".gitignore")
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    ignored = subprocess.run(["git", "check-ignore", "-q", ".claude/settings.local.json"], cwd=tmp_path)
-    example = subprocess.run(["git", "check-ignore", "-q", ".claude/settings.local.example.json"], cwd=tmp_path)
-    assert ignored.returncode == 0, "settings.local.json would be committed"
-    assert example.returncode == 1, "the example would not be committed"
+    ignored = subprocess.run(["git", "check-ignore", "-q", local], cwd=tmp_path)
+    template = subprocess.run(["git", "check-ignore", "-q", committed], cwd=tmp_path)
+    assert ignored.returncode == 0, f"{local} would be committed"
+    assert template.returncode == 1, f"{committed} would not be committed"
+    assert (kit_root / committed).is_file()
 
 
 def test_host_dotfiles_that_reload_bashrc_do_not_loop(tmp_path, kit_root):
@@ -119,6 +141,7 @@ STUB = '() { printf "%s\\n" "docker $*" >> "$STUB_LOG"; [ "$1" != image ]; }'
 @pytest.fixture
 def project(tmp_path: Path, kit_root: Path) -> Path:
     shutil.copytree(kit_root / ".devcontainer", tmp_path / ".devcontainer")
+    (tmp_path / ".devcontainer" / "kit.local.env").unlink(missing_ok=True)
     subprocess.run(["python3", ".devcontainer/set-project-name.py", "demo"], cwd=tmp_path, check=True,
                    capture_output=True)
     # Its own repo, or run.sh would resolve the repo root of whatever encloses it.
@@ -169,6 +192,42 @@ def test_run_sh_build_only_does_not_run(project):
     done, calls = run_sh(project, "--build-only")
     assert done.returncode == 0, done.stderr
     assert not any(c.startswith("docker run") for c in calls)
+
+
+def test_run_sh_in_a_worktree_builds_its_kit_and_mounts_the_primary(project, kit_root):
+    # A worktree made in the container: its .git names a path the host lacks.
+    worktree = project / ".claude" / "worktrees" / "wt"
+    shutil.copytree(project / ".devcontainer", worktree / ".devcontainer")
+    (worktree / ".git").write_text("gitdir: /no/such/.git/worktrees/wt\n")
+    kit = worktree / ".devcontainer" / "kit.env"
+    kit.write_text(kit.read_text().replace("WITH_RUBY=0", "WITH_RUBY=1"))
+    log = project / "docker.log"
+    log.write_text("")
+    env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(project / "home"),
+           "STUB_LOG": str(log), "PIN_CLAUDE_CODE": "9.9.9", "BASH_FUNC_docker%%": STUB}
+    done = subprocess.run(["bash", str(worktree / ".devcontainer" / "run.sh")], cwd=worktree,
+                          capture_output=True, text=True, env=env, timeout=60)
+    assert done.returncode == 0, done.stderr
+    calls = log.read_text().splitlines()
+    build = next(c for c in calls if c.startswith("docker build"))
+    assert "WITH_RUBY=1" in build and f"-f {worktree}/.devcontainer/Dockerfile" in build
+    run = next(c for c in calls if c.startswith("docker run"))
+    assert f"-v {project}:/workspace" in run and "--name demo-primary" in run
+
+
+def test_kit_local_env_overrides_the_name(project):
+    text = (project / ".devcontainer" / "kit.env").read_text().replace("PROJECT_NAME=demo", "PROJECT_NAME=changeme")
+    (project / ".devcontainer" / "kit.local.env").write_text("# mine\nPROJECT_NAME=mine\n")
+    done, calls = run_sh(project, kit_env_text=text)
+    assert done.returncode == 0, done.stderr
+    assert "--name mine-primary" in next(c for c in calls if c.startswith("docker run"))
+
+
+def test_kit_local_env_takes_only_the_name(project):
+    (project / ".devcontainer" / "kit.local.env").write_text("WITH_RUBY=1\n")
+    done, calls = run_sh(project)
+    assert done.returncode == 1 and "only PROJECT_NAME" in done.stderr
+    assert calls == []
 
 
 @pytest.mark.parametrize("edit,message", [

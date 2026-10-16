@@ -1,7 +1,18 @@
 {
+  "worktree": {
+    "baseRef": "head"
+  },
   "permissions": {
     "blockReadsOutsideWorkingDirectories": true,
+    "additionalDirectories": [
+      "/opt",
+      "/workspace/.claude/worktrees"
+    ],
     "allow": [
+      "Read(//dev/null)",
+      "Edit(//dev/null)",
+      "Bash(python3 -m pytest)",
+      "Bash(python3 -m pytest -q)",
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git log *)",
@@ -14,9 +25,13 @@
       "Bash(git commit -F *)",
       "Bash(git merge origin/main)",
       "Bash(sh scripts/git-fetch-main.sh)",
+      "Bash(sh scripts/git-diff-main-checkout.sh)",
+      "Bash(sh scripts/git-diff-main-checkout.sh *)",
       "Bash(sh scripts/git-push-agent.sh *)",
       "Bash(sh scripts/git-fetch-agent.sh *)",
       "Bash(sh scripts/git-clone-agent.sh *)",
+      "Bash(node tools/dev/shoot.js *)",
+      "Bash(node tools/dev/slice-png.js *)",
       "Bash(sh scripts/gh-read.sh *)",
       "Bash(sh scripts/gh-write.sh *)",
       "Bash(sh scripts/github-public-status.sh *)",
@@ -79,6 +94,36 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-token-expansion.py\"",
             "timeout": 20,
             "statusMessage": "Checking for token exposure"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git-output.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking git diff options"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-unanalyzable-bash.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking the command can be analysed"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-inline-script.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking for inline programs"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-sed.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking for sed"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-awk.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking for awk"
           }
         ]
       }

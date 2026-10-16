@@ -53,10 +53,23 @@ def test_a_pattern_falls_back_to_hashing_everything(stamp, context):
     assert stamp.build_inputs_hash(context) != before
 
 
+def test_command_line_takes_a_context(kit_root, context):
+    import subprocess
+    script = kit_root / ".devcontainer" / "build_inputs_hash.py"
+    from_arg = subprocess.run(["python3", str(script), "A=1", str(context)],
+                              capture_output=True, text=True, check=True).stdout.strip()
+    (context / ".devcontainer").mkdir()
+    for name in ("Dockerfile", "run.sh", ".dockerignore"):
+        (context / ".devcontainer" / name).write_bytes((context / name).read_bytes())
+    default = subprocess.run(["python3", str(script), "A=1"], cwd=context,
+                             capture_output=True, text=True, check=True).stdout.strip()
+    assert from_arg == default
+
+
 def test_shipped_dockerignore_is_understood(stamp, kit_root):
     names = stamp.exclusions(kit_root / ".devcontainer")
     assert names, "the shipped .dockerignore fell back to hashing everything"
-    for name in names:
+    for name in names - {"kit.local.env"}:  # gitignored, so absent from a fresh clone
         assert (kit_root / ".devcontainer" / name).is_file(), f".dockerignore names a missing {name}"
     for built in ("Dockerfile", "init-firewall.sh", "requirements.txt"):
         assert built not in names, f"{built} is COPY'd by the Dockerfile and must stay in the stamp"
