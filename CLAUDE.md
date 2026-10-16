@@ -8,6 +8,9 @@ is the only enforcement.
 - Claude runs inside the container started by `.devcontainer/run.sh`. Only this
   project is mounted, at `/workspace`. The SessionStart hook says if a session
   is NOT in the container: say so before doing anything else.
+- A change to `.devcontainer/` (packages, toggles) reaches the container when
+  I run that worktree's `.devcontainer/run.sh` from the host, or after merge.
+  Tell me which.
 - **Scratch files go in this project's `tmp/`** (gitignored), never the system
   `/tmp`, never `~`.
 - <Project build / test / serve commands go here.>

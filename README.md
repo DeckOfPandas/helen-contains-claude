@@ -102,8 +102,12 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 - **One container per project.** The fixed container name refuses a second
   `run.sh`, so two Claudes never edit one working tree. To run several
   sessions at once, use git worktrees inside the one container.
-- Run `run.sh` from inside a worktree and it still mounts the primary clone,
-  so all worktrees share one container.
+- `run.sh` always mounts the primary clone, so all worktrees share one
+  container. It builds from the `.devcontainer/` it sits in, so to try a
+  branch's `kit.env` or Dockerfile before it is merged, run that worktree's
+  copy from the host:
+
+      bash .claude/worktrees/<name>/.devcontainer/run.sh
 - `.devcontainer/project.bashrc` holds project aliases. It is read from the
   mount at shell start, so edits don't need a rebuild. A server must listen on
   `0.0.0.0` to be reachable through a published port.

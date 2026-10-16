@@ -178,6 +178,27 @@ def test_run_sh_build_only_does_not_run(project):
     assert not any(c.startswith("docker run") for c in calls)
 
 
+def test_run_sh_in_a_worktree_builds_its_kit_and_mounts_the_primary(project, kit_root):
+    # A worktree made in the container: its .git names a path the host lacks.
+    worktree = project / ".claude" / "worktrees" / "wt"
+    shutil.copytree(project / ".devcontainer", worktree / ".devcontainer")
+    (worktree / ".git").write_text("gitdir: /no/such/.git/worktrees/wt\n")
+    kit = worktree / ".devcontainer" / "kit.env"
+    kit.write_text(kit.read_text().replace("WITH_RUBY=0", "WITH_RUBY=1"))
+    log = project / "docker.log"
+    log.write_text("")
+    env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(project / "home"),
+           "STUB_LOG": str(log), "PIN_CLAUDE_CODE": "9.9.9", "BASH_FUNC_docker%%": STUB}
+    done = subprocess.run(["bash", str(worktree / ".devcontainer" / "run.sh")], cwd=worktree,
+                          capture_output=True, text=True, env=env, timeout=60)
+    assert done.returncode == 0, done.stderr
+    calls = log.read_text().splitlines()
+    build = next(c for c in calls if c.startswith("docker build"))
+    assert "WITH_RUBY=1" in build and f"-f {worktree}/.devcontainer/Dockerfile" in build
+    run = next(c for c in calls if c.startswith("docker run"))
+    assert f"-v {project}:/workspace" in run and "--name demo-primary" in run
+
+
 def test_kit_local_env_overrides_the_name(project):
     text = (project / ".devcontainer" / "kit.env").read_text().replace("PROJECT_NAME=demo", "PROJECT_NAME=changeme")
     (project / ".devcontainer" / "kit.local.env").write_text("# mine\nPROJECT_NAME=mine\n")
