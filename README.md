@@ -49,7 +49,7 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
    | `WITH_PLAYWRIGHT=1` | Playwright `PLAYWRIGHT_VERSION` + headless Chromium under `/opt/playwright`, npm and pip bindings |
    | `WITH_PY_REQS=1` | `pip install -r .devcontainer/requirements.txt` |
 
-   Also in `kit.env`: `PORTS` (e.g. `"5998:4000"`), `EXTRA_ALLOWED_DOMAINS`
+   Also in `kit.env`: `PORTS` (e.g. `"5000:5000 5001:5001"`), `EXTRA_ALLOWED_DOMAINS`
    for the firewall, and `MOUNT_DOTFILES`.
 
 3. **GitHub agent account** (skip this step if Claude won't push):
@@ -76,6 +76,10 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
        claude                               # first time: log in (below)
 
    The first build takes a few minutes after you change anything.
+
+   On Windows, you probably need to set execute permissions for the script:
+       `chmod u+x .devcontainer/run.sh`
+
 
 ### First login
 
