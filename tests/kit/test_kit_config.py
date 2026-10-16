@@ -55,6 +55,15 @@ def test_build_args_exist_in_the_dockerfile_with_kit_env_defaults(kit_root):
         assert args[name].strip('"') == env[name], f"Dockerfile default for {name} differs from kit.env"
 
 
+def test_python_packages_are_pinned(kit_root):
+    dockerfile = (kit_root / ".devcontainer" / "Dockerfile").read_text()
+    assert re.search(r'"pytest==\d+\.\d+\.\d+"', dockerfile), "pytest is not pinned in the Dockerfile"
+    for line in (kit_root / ".devcontainer" / "requirements.txt").read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            assert re.fullmatch(r"[A-Za-z0-9_.-]+==[0-9][A-Za-z0-9.]*", line), f"unpinned: {line}"
+
+
 def test_settings_json_hooks_exist(kit_root):
     settings = json.loads((kit_root / ".claude" / "settings.json").read_text())
     commands = [h["command"] for event in settings["hooks"].values()

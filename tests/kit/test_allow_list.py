@@ -97,6 +97,15 @@ def test_no_allow_rule_lets_curl_choose_where_to_write():
         assert not rule.startswith("Bash(curl"), rule
 
 
+def test_pytest_is_allowed_only_without_arguments():
+    """`--basetemp=<dir>` empties the folder it names, so a pytest rule ending
+    ` *` would let one unasked call wipe the project. pytest.ini pins basetemp
+    to tmp/pytest; anything past `-q` asks."""
+    for rule in _rules("allow"):
+        if "pytest" in rule:
+            assert rule in ("Bash(python3 -m pytest)", "Bash(python3 -m pytest -q)"), rule
+
+
 def test_no_allow_rule_runs_a_tmp_script():
     """A tmp/ script keeps asking. It is code nobody has reviewed, and the
     checker sees only its name -- it could read outside the project, which

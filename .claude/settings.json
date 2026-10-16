@@ -11,6 +11,8 @@
     "allow": [
       "Read(//dev/null)",
       "Edit(//dev/null)",
+      "Bash(python3 -m pytest)",
+      "Bash(python3 -m pytest -q)",
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git log *)",

@@ -50,10 +50,10 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 
    | Toggle | Adds |
    |---|---|
-   | *(always)* | Debian bookworm, git, curl, jq, Python 3, Node, `gh`, Claude Code |
+   | *(always)* | Debian bookworm, git, curl, jq, Python 3, pytest, Node, `gh`, Claude Code |
    | `WITH_RUBY=1` | Ruby `RUBY_VERSION` (base becomes `ruby:<v>-slim-bookworm`), build headers, a persistent bundle cache |
    | `WITH_PLAYWRIGHT=1` | Playwright `PLAYWRIGHT_VERSION` + headless Chromium under `/opt/playwright`, npm and pip bindings |
-   | `WITH_PY_REQS=1` | `pip install -r .devcontainer/requirements.txt` |
+   | `WITH_PY_REQS=1` | `pip install -r .devcontainer/requirements.txt`: PyYAML and Pillow, plus whatever you add |
 
    Also in `kit.env`: `PORTS` (e.g. `"5000:5000 5001:5001"`), `EXTRA_ALLOWED_DOMAINS`
    for the firewall, and `MOUNT_DOTFILES`.
@@ -192,5 +192,7 @@ project made from the kit commits its own.
     python3 -m pytest
 
 These cover the wrappers' refusals (dry-run, no network), the hooks, the build
-stamp, and that `kit.env` and `devcontainer.json` agree. They need `pytest`;
-put it in `requirements.txt` with `WITH_PY_REQS=1`, or run them on the host.
+stamp, and that `kit.env` and `devcontainer.json` agree. The image always has
+`pytest`, and Claude may run `python3 -m pytest` or `python3 -m pytest -q`
+unasked; anything with more arguments asks, because `--basetemp` empties the
+folder it is given.
