@@ -62,7 +62,8 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
    - Create a separate GitHub account for the bot. Invite it as a
      collaborator on just the repos you want it to work in.
    - Create it a classic PAT scoped to `repo`, and `workflow` if it
-     should edit `.github/workflows/`.
+     should edit `.github/workflows/`: without it, GitHub refuses any push
+     that touches a workflow file, and `git-push-agent.sh` says so.
    - Paste the token in `.claude/settings.local.json`, which is gitignored. A
      fresh project doesn't have that file yet, so copy the committed example
      to it, leaving the example in place, then paste the token between the
@@ -97,6 +98,13 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 ### First login
 
 `claude`, then do the Claude login thing.
+
+### First deploy
+
+A GitHub Pages workflow (for example Jekyll's) builds but publishes nothing
+until you set the repository's **Settings → Pages → Source** to **GitHub
+Actions**. That is a repository setting, which the agent must not change, so
+it is yours to do once.
 
 ## Using it
 

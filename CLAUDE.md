@@ -81,6 +81,8 @@ is the only enforcement.
   account flagged as spam, and GitHub then hides everything it ever wrote. A
   batch is ONE issue with a checklist.
 - Never change repository settings, secrets, Actions settings or collaborators.
+  A Pages workflow publishes nothing until I set Settings → Pages → Source to
+  GitHub Actions: when you add one, say so in the PR description.
 
 ## Writing
 - **A code comment states a constraint the code cannot show**, in the present
