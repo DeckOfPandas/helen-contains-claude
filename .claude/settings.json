@@ -2,6 +2,8 @@
   "permissions": {
     "blockReadsOutsideWorkingDirectories": true,
     "allow": [
+      "Read(//dev/null)",
+      "Edit(//dev/null)",
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git log *)",
