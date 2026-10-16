@@ -1,4 +1,4 @@
-# Claude Code Rules for <PROJECT>
+# Claude Code Rules for Helen Contains Claude
 
 **This file is the RULES.** It loads into every session, so keep it short. Where
 a rule names a hook, the hook enforces it. Where it names none, this paragraph
@@ -11,6 +11,7 @@ is the only enforcement.
 - **Scratch files go in this project's `tmp/`** (gitignored), never the system
   `/tmp`, never `~`.
 - <Project build / test / serve commands go here.>
+- You can read from /opt, and other agents' worktrees, but otherwise you cannot read from outseid your working folder. cd commands starting / will be denied.
 
 ## Critical restrictions
 - NEVER run `rm -rf` outside `tmp/` without asking me first.
