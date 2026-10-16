@@ -65,6 +65,13 @@ def test_settings_json_hooks_exist(kit_root):
     assert "Bash(sh scripts/gh-agent.sh pr merge *)" in settings["permissions"]["deny"]
 
 
+def test_playwright_lives_in_an_allowed_directory(kit_root):
+    settings = json.loads((kit_root / ".claude" / "settings.json").read_text())
+    dockerfile = (kit_root / ".devcontainer" / "Dockerfile").read_text()
+    assert "/opt/playwright" in dockerfile
+    assert "/opt" in settings["permissions"]["additionalDirectories"]
+
+
 def test_settings_local_example_is_what_run_sh_reads(tmp_path, kit_root):
     (tmp_path / ".claude").mkdir()
     example = kit_root / ".claude" / "settings.local.example.json"

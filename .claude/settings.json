@@ -4,6 +4,10 @@
   },
   "permissions": {
     "blockReadsOutsideWorkingDirectories": true,
+    "additionalDirectories": [
+      "/opt",
+      "/workspace/.claude/worktrees"
+    ],
     "allow": [
       "Read(//dev/null)",
       "Edit(//dev/null)",
