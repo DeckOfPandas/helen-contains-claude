@@ -38,6 +38,9 @@ is the only enforcement.
 - **Never `git reset --hard`, `git checkout --`, `git restore` or `git clean -f`
   over a dirty tree without asking me.** `guard-destructive-git.py` enforces it.
   To set work aside, use `git stash push -u -m <tag>`.
+- **From a worktree, see my uncommitted edits in the main checkout** with
+  `sh scripts/git-diff-main-checkout.sh` (`--stat`, or `--patch
+  tmp/<name>.patch` for `git apply`).
 - **Update main without checking it out:** `sh scripts/git-fetch-main.sh`, then
   `git merge origin/main`.
 - **The workflow:** push the branch with

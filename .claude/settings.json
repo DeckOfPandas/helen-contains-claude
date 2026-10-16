@@ -16,6 +16,8 @@
       "Bash(git commit -F *)",
       "Bash(git merge origin/main)",
       "Bash(sh scripts/git-fetch-main.sh)",
+      "Bash(sh scripts/git-diff-main-checkout.sh)",
+      "Bash(sh scripts/git-diff-main-checkout.sh *)",
       "Bash(sh scripts/git-push-agent.sh *)",
       "Bash(sh scripts/git-fetch-agent.sh *)",
       "Bash(sh scripts/git-clone-agent.sh *)",
