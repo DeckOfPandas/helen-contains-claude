@@ -15,8 +15,9 @@ is the only enforcement.
   `/tmp`, never `~`.
 - <Project build / test / serve commands go here.>
 - Reads outside the working directory are refused, except `/opt` and other
-  agents' worktrees. `/dev/null` is allowed for reading and writing, as that
-  exact path.
+  agents' worktrees. Use `/dev/null` only as a redirection (`> /dev/null`,
+  `2>/dev/null`, `< /dev/null`), which is never checked. As a command argument
+  it is a read outside and asks me.
 - **Paths are relative to the working directory.** No leading `cd`, no
   `git -C`, no absolute paths into the project.
 - **One plain command per Bash call.** Anything that needs a loop, a chain, or
