@@ -19,6 +19,10 @@
 // input. Tall pages come out tall: tools/dev/slice-png.js cuts them into
 // readable pieces.
 //
+// Each shot's line says `ok`, or `OVERFLOW` when the page is wider than the
+// viewport (sideways scrolling on a phone), followed by the elements that
+// stick out furthest.
+//
 // Needs WITH_PLAYWRIGHT=1 in kit.env. The image sets NODE_PATH to
 // /opt/playwright/node_modules, so `require('playwright')` resolves with no
 // prefix on the command.
@@ -56,6 +60,24 @@ function parse(argv) {
   return opts;
 }
 
+// Runs in the page. Mobile emulation grows the layout viewport to fit the
+// widest content, so innerWidth would hide the overflow: the width asked for
+// is the yardstick. Names the elements that stick out furthest, widest first.
+function overflow(width) {
+  const docW = Math.max(document.documentElement.scrollWidth, window.innerWidth);
+  if (docW <= width) return { docW, wide: [] };
+  const wide = [];
+  for (const el of document.querySelectorAll('body *')) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && (r.right > width + 1 || r.left < -1)) {
+      const cls = typeof el.className === 'string' ? el.className.slice(0, 60) : '';
+      wide.push({ tag: el.tagName.toLowerCase(), cls, left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width) });
+    }
+  }
+  wide.sort((a, b) => b.right - a.right);
+  return { docW, wide: wide.slice(0, 8) };
+}
+
 function usage(message) {
   console.error(`shoot.js: ${message}\nusage: node tools/dev/shoot.js <base-url> <label> [--engine chromium|webkit] [--scheme light|dark] [--click <text>]... [--type <text>] <page>...`);
   process.exit(2);
@@ -91,8 +113,13 @@ function usage(message) {
           await page.waitForTimeout(400);
         }
         await page.waitForTimeout(300);
+        const report = await page.evaluate(overflow, width);
         await page.screenshot({ path: file, fullPage: true });
-        console.log(`${name} ${p} -> ${file}`);
+        const flag = report.docW > width ? `OVERFLOW doc=${report.docW} viewport=${width}` : 'ok';
+        console.log(`${name} ${p} ${flag} -> ${file}`);
+        for (const w of report.wide) {
+          console.log(`    <${w.tag} class="${w.cls}"> left=${w.left} right=${w.right} width=${w.width}`);
+        }
       } catch (e) {
         failed = true;
         console.log(`${name} ${p} ERROR ${e.message.split('\n')[0]}`);
