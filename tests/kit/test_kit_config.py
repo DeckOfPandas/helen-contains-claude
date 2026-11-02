@@ -50,9 +50,14 @@ def test_build_args_exist_in_the_dockerfile_with_kit_env_defaults(kit_root):
     block = re.search(r"BUILD_ARGS=\(\n(.*?)\n\)", run_sh, re.DOTALL).group(1)
     for name in re.findall(r'"(\w+)=', block) + ["CLAUDE_CODE_VERSION"]:
         assert name in args, f"run.sh passes {name}, which the Dockerfile never declares"
+    # A project turns toggles on in kit.env, so only the versions must agree; a
+    # bare `docker build` gets every toggle off.
     env = kit_env(kit_root)
-    for name in ("NODE_MAJOR", "WITH_RUBY", "WITH_PLAYWRIGHT", "PLAYWRIGHT_VERSION", "WITH_PY_REQS"):
+    for name in ("NODE_MAJOR", "PLAYWRIGHT_VERSION"):
         assert args[name].strip('"') == env[name], f"Dockerfile default for {name} differs from kit.env"
+    for name in KIT_DEFAULTS:
+        if name.startswith("WITH_"):
+            assert args[name].strip('"') == "0", f"Dockerfile default for {name} is not off"
 
 
 def test_python_packages_are_pinned(kit_root):
@@ -137,11 +142,27 @@ def test_set_project_name(tmp_path, kit_root):
 
 STUB = '() { printf "%s\\n" "docker $*" >> "$STUB_LOG"; [ "$1" != image ]; }'
 
+# The kit's own toggle values. The run.sh tests edit from these, whatever a
+# project has set in its kit.env.
+KIT_DEFAULTS = {
+    "WITH_RUBY": "0",
+    "WITH_PLAYWRIGHT": "0",
+    "WITH_PY_REQS": "0",
+    "PORTS": '""',
+    "EXTRA_ALLOWED_DOMAINS": '""',
+    "MOUNT_DOTFILES": "1",
+}
+
 
 @pytest.fixture
 def project(tmp_path: Path, kit_root: Path) -> Path:
     shutil.copytree(kit_root / ".devcontainer", tmp_path / ".devcontainer")
     (tmp_path / ".devcontainer" / "kit.local.env").unlink(missing_ok=True)
+    kit = tmp_path / ".devcontainer" / "kit.env"
+    text = kit.read_text()
+    for key, value in KIT_DEFAULTS.items():
+        text = re.sub(rf"^{key}=.*$", f"{key}={value}", text, flags=re.MULTILINE)
+    kit.write_text(text)
     subprocess.run(["python3", ".devcontainer/set-project-name.py", "demo"], cwd=tmp_path, check=True,
                    capture_output=True)
     # Its own repo, or run.sh would resolve the repo root of whatever encloses it.

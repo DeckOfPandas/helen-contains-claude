@@ -9,8 +9,6 @@
       "/workspace/.claude/worktrees"
     ],
     "allow": [
-      "Read(//dev/null)",
-      "Edit(//dev/null)",
       "Bash(python3 -m pytest)",
       "Bash(python3 -m pytest -q)",
       "Bash(git status *)",
@@ -32,9 +30,15 @@
       "Bash(sh scripts/git-clone-agent.sh *)",
       "Bash(node tools/dev/shoot.js *)",
       "Bash(node tools/dev/slice-png.js *)",
+      "Bash(node tools/dev/crop.js *)",
+      "Bash(node tools/dev/styles.js *)",
       "Bash(sh scripts/gh-read.sh *)",
       "Bash(sh scripts/gh-write.sh *)",
       "Bash(sh scripts/github-public-status.sh *)",
+      "Bash(sh scripts/check-link.sh *)",
+      "Bash(sh scripts/main-ci-status.sh)",
+      "Bash(sh scripts/main-ci-status.sh *)",
+      "Bash(sh scripts/git-nested.sh *)",
       "Bash(sh scripts/gh-agent.sh issue list *)",
       "Bash(sh scripts/gh-agent.sh issue view *)",
       "Bash(sh scripts/gh-agent.sh issue comment *)",
@@ -100,6 +104,12 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git-output.py\"",
             "timeout": 20,
             "statusMessage": "Checking git diff options"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-dev-null.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking /dev/null is only a redirection"
           },
           {
             "type": "command",

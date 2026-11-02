@@ -15,4 +15,5 @@ project.bashrc
 build_inputs_hash.py
 claude_code_latest.py
 read_local_token.py
+seed_memory.py
 set-project-name.py

@@ -175,6 +175,11 @@ def test_label_create(project):
     assert "repos/acme/drafts/labels" in out and "name=parked" in out and "color=9a9a9a" in out
 
 
+def test_issue_label(project):
+    out = ok(run(project, "gh-write.sh", "issue-label", "site", "5", "parked"))
+    assert "repos/acme/site/issues/5/labels" in out and "labels[]=parked" in out and "POST" in out
+
+
 @pytest.mark.parametrize("args", [
     ["issue-create", "other", "T", "tmp/body.md"],
     ["issue-create", "site", "", "tmp/body.md"],
@@ -187,6 +192,13 @@ def test_label_create(project):
     ["label-create", "site", "parked", "gggggg"],
     ["label-create", "site", "a;b", "9a9a9a"],
     ["label-create", "other", "parked", "9a9a9a"],
+    ["issue-label", "site", "05", "parked"],
+    ["issue-label", "site", "x", "parked"],
+    ["issue-label", "site", "5", "two words"],
+    ["issue-label", "site", "5", "-x"],
+    ["issue-label", "other", "5", "parked"],
+    ["issue-label", "site", "5"],
+    ["issue-label", "site", "5", "parked", "more"],
 ])
 def test_issue_and_label_refusals(project, args):
     assert refused(run(project, "gh-write.sh", *args))
@@ -205,6 +217,29 @@ def test_public_status_refusals(project, url):
     assert refused(run(project, "github-public-status.sh", url))
 
 
+# --- check a link -----------------------------------------------------------------
+
+@pytest.mark.parametrize("url", ["https://example.org/page", "https://www.gov.uk/a/b?c=1&d=2#e",
+                                 "https://web.archive.org/web/20250323181601/https://ahdb.org.uk/news/x"])
+def test_check_link_ok(project, url):
+    out = ok(run(project, "check-link.sh", url))
+    assert out[-1] == url
+    assert "/dev/null" in out and "--location" in out and "--proto" in out
+
+
+@pytest.mark.parametrize("url", ["http://example.org", "ftp://example.org", "example.org",
+                                 "https://user@example.org", "https://example.org/../x",
+                                 "https://example.org/a b", "https://example.org/$(id)",
+                                 "https://example.org/x;rm", ""])
+def test_check_link_refusals(project, url):
+    assert refused(run(project, "check-link.sh", url))
+
+
+def test_check_link_takes_one_url(project):
+    assert refused(run(project, "check-link.sh", "https://a.org", "https://b.org"))
+    assert refused(run(project, "check-link.sh"))
+
+
 # --- config parsing ---------------------------------------------------------------
 
 @pytest.mark.parametrize("conf", [
@@ -219,10 +254,14 @@ def test_bad_config_is_refused(project, conf):
     assert refused(run(project, "git-fetch-main.sh", conf=conf))
 
 
-def test_shipped_config_is_the_placeholder(kit_root, project):
+def test_shipped_config_is_the_placeholder_or_valid(kit_root, project):
+    # The kit ships the placeholder; a project made from it may commit its own.
     shipped = (kit_root / "scripts" / "github.conf").read_text()
     result = run(project, "git-fetch-main.sh", conf=shipped)
-    assert refused(result) and "placeholder" in result.stderr
+    if "GH_OWNER=your-org" in shipped:
+        assert refused(result) and "placeholder" in result.stderr
+    else:
+        ok(result)
 
 
 def test_local_config_replaces_the_committed_one(project):

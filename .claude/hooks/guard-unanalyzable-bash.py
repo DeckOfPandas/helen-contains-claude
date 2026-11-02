@@ -36,6 +36,9 @@ Refused:
      runs the rest as a second command, which the checker sees as a fragment
      and asks the human about. It arrives in an unquoted URL query string.
      `&&` is shape 5; `2>&1`, `>&2` and `&>file` are redirections.
+ 13. An unquoted word starting with `=`: zsh expands `=cmd` to that command's
+     path, so the checker cannot know the argument. It arrives as
+     `curl --proto =https`. A quoted `'=https'` and `--flag=value` pass.
 
 Allowed on purpose, because a guard that fires on harmless commands gets
 routed around:
@@ -244,6 +247,11 @@ def _offence(command: str) -> tuple[str, str] | None:
                 "'repos/o/r/issues?state=open&per_page=100' --each "
                 "number,title`. To run something in the background, use the "
                 "Bash tool's run_in_background, never a trailing `&`")
+
+    if any(token.startswith("=") for token in scannable.split()):
+        return ("an unquoted word starting with `=`, which zsh expands to a "
+                "command's path (`=cmd`), so the checker cannot know it",
+                "single-quote the word: `curl --proto '=https'`")
 
     # Shape 9. An unquoted parenthesis is a subshell or, as in an unquoted
     # `git log --format=%(trailers)`, a parse error. A backslash-escaped paren

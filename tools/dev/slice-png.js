@@ -9,8 +9,8 @@
 // shown at 1:1 and each slice is a clipped screenshot of it.
 //
 // Needs WITH_PLAYWRIGHT=1 in kit.env (see tools/dev/shoot.js).
+const fs = require('fs');
 const path = require('path');
-const { pathToFileURL } = require('url');
 
 const [input, heightArg] = process.argv.slice(2);
 const sliceHeight = Number(heightArg || 1600);
@@ -28,15 +28,18 @@ if (!Number.isInteger(sliceHeight) || sliceHeight < 100) {
   const { chromium } = require('playwright');
   const browser = await chromium.launch();
   const page = await browser.newPage({ deviceScaleFactor: 1 });
-  await page.goto(pathToFileURL(path.resolve(input)).href);
+  // A plain page holding the image at its own size in the top left corner,
+  // so a clip of the page is a slice of it. The image goes in as a data
+  // URL: a blank page may not load a file:// image, and Chromium's own
+  // image viewer centres and shrinks a tall one and keeps its page the
+  // viewport's height, so a clip below the fold is "outside the image".
+  const data = 'data:image/png;base64,' + fs.readFileSync(path.resolve(input)).toString('base64');
+  await page.setContent(`<body style="margin:0"><img src="${data}" style="display:block"></body>`, { waitUntil: 'load' });
   const { width, height } = await page.evaluate(() => {
     const img = document.querySelector('img');
     return { width: img.naturalWidth, height: img.naturalHeight };
   });
-  // The image viewer centres and scales; a plain page at the image's own size does not.
   await page.setViewportSize({ width, height: Math.min(height, sliceHeight) });
-  await page.setContent(`<body style="margin:0"><img src="${pathToFileURL(path.resolve(input)).href}" style="display:block"></body>`);
-  await page.waitForLoadState('load');
   const stem = input.replace(/\.png$/, '');
   let n = 0;
   for (let y = 0; y < height; y += sliceHeight) {

@@ -11,4 +11,8 @@ if [ -z "$_CONTAINER_RC_DONE" ]; then
   [ -f "$HOME/.host-bashrc" ] && . "$HOME/.host-bashrc"
   [ -f "$HOME/.host-bash_aliases" ] && . "$HOME/.host-bash_aliases"
   [ -f "$HOME/.host-bash_profile" ] && . "$HOME/.host-bash_profile"
+  # The config volume starts empty, so a new project's Claude Code memory gets
+  # the kit's notes once; the marker keeps a deleted note deleted.
+  [ -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/-workspace/memory/.kit-seeded" ] \
+    || python3 /workspace/.devcontainer/seed_memory.py
 fi
