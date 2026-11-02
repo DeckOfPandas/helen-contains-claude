@@ -33,7 +33,8 @@ scripts/
   git-diff-main-checkout.sh  the main checkout's uncommitted changes, from a worktree
   check-link.sh          does one https link resolve: status and final address
 tools/dev/
-  shoot.js               full-page screenshots, phone and desktop, light or dark
+  shoot.js               full-page screenshots, phone and desktop, light or dark,
+                         Chromium or WebKit
   slice-png.js           cuts a tall screenshot into readable pieces
 CLAUDE.md                rules starter: fill in <PROJECT> and the build commands
 tests/kit/               tests for the wrappers, hooks, stamp and config
@@ -53,7 +54,7 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
    |---|---|
    | *(always)* | Debian bookworm, git, curl, jq, Python 3, pytest, Node, `gh`, Claude Code |
    | `WITH_RUBY=1` | Ruby `RUBY_VERSION` (base becomes `ruby:<v>-slim-bookworm`), build headers, a persistent bundle cache |
-   | `WITH_PLAYWRIGHT=1` | Playwright `PLAYWRIGHT_VERSION` + headless Chromium under `/opt/playwright`, npm and pip bindings |
+   | `WITH_PLAYWRIGHT=1` | Playwright `PLAYWRIGHT_VERSION` + headless Chromium and WebKit (nearest Safari) under `/opt/playwright`, npm and pip bindings |
    | `WITH_PY_REQS=1` | `pip install -r .devcontainer/requirements.txt`: PyYAML and Pillow, plus whatever you add |
 
    Also in `kit.env`: `PORTS` (e.g. `"5000:5000 5001:5001"`), `EXTRA_ALLOWED_DOMAINS`

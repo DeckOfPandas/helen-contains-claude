@@ -59,14 +59,15 @@ RUN if [ "$WITH_RUBY" = 1 ]; then \
 ENV BUNDLE_PATH=/state/bundle
 
 # The npm and pip bindings are pinned to ONE version so they resolve to one
-# Chromium revision; two versions would put two browsers in the image.
+# revision of each browser; two versions would put two of each in the image.
+# WebKit is the engine nearest Safari.
 ARG WITH_PLAYWRIGHT=0
 ARG PLAYWRIGHT_VERSION=1.63.0
 RUN if [ "$WITH_PLAYWRIGHT" = 1 ]; then \
       mkdir -p /opt/playwright && cd /opt/playwright \
       && npm init -y > /dev/null \
       && npm install --no-audit --no-fund "playwright@${PLAYWRIGHT_VERSION}" \
-      && PLAYWRIGHT_BROWSERS_PATH=/opt/playwright/ms-playwright npx playwright install --with-deps chromium \
+      && PLAYWRIGHT_BROWSERS_PATH=/opt/playwright/ms-playwright npx playwright install --with-deps chromium webkit \
       && pip install --break-system-packages --no-cache-dir "playwright==${PLAYWRIGHT_VERSION}" \
       && rm -rf /var/lib/apt/lists/* /root/.npm; \
     fi

@@ -19,9 +19,11 @@ is the only enforcement.
   `http://localhost:<host port>/`, plus the `baseurl` from `_config.yml` for a
   Jekyll site. No pair in `PORTS` means I can't reach it: ask me to add one.
 - Visual checks (Playwright on): `node tools/dev/shoot.js <base-url> <label>
-  [--scheme dark] [--click <text>] <path>...` writes `tmp/shots/`, and
+  [--engine webkit] [--scheme dark] [--click <text>] [--type <text>] <page>...`
+  writes `tmp/shots/` (WebKit is the engine nearest Safari), and
   `node tools/dev/slice-png.js tmp/shots/<file>.png` cuts a tall one. Use these
-  rather than writing new ones in `tmp/`.
+  rather than writing new ones in `tmp/`. A page is relative to the base URL
+  (`.`, `about/`), never `/about/`: a leading `/` reads as a path outside.
 - Reads outside the working directory are refused, except `/opt` and other
   agents' worktrees. Use `/dev/null` only as a redirection (`> /dev/null`,
   `2>/dev/null`, `< /dev/null`), which is never checked. As a command argument
