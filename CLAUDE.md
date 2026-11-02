@@ -27,8 +27,11 @@ is the only enforcement.
 - Visual checks (Playwright on): `node tools/dev/shoot.js <base-url> <label>
   [--engine webkit] [--scheme dark] [--click <text>] [--type <text>] <page>...`
   writes `tmp/shots/` (WebKit is the engine nearest Safari), and
-  `node tools/dev/slice-png.js tmp/shots/<file>.png` cuts a tall one. Use these
-  rather than writing new ones in `tmp/`. A page is relative to the base URL
+  `node tools/dev/slice-png.js tmp/shots/<file>.png` cuts a tall one. For one
+  element up close, `node tools/dev/crop.js <base-url> <label> <selector>
+  [<page>]`; for its box and computed styles, `node tools/dev/styles.js
+  <base-url> <selector> [<page>]`. Use these rather than writing new ones in
+  `tmp/`. A page is relative to the base URL
   (`.`, `about/`), never `/about/`: a leading `/` reads as a path outside.
 - Reads outside the working directory are refused, except `/opt` and other
   agents' worktrees. Use `/dev/null` only as a redirection (`> /dev/null`,

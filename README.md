@@ -45,6 +45,8 @@ tools/dev/
   shoot.js               full-page screenshots, phone and desktop, light or dark,
                          Chromium or WebKit
   slice-png.js           cuts a tall screenshot into readable pieces
+  crop.js                one element at 2x, with its box, optionally after typing
+  styles.js              each match's box and computed styles
 CLAUDE.md                rules starter: fill in <PROJECT> and the build commands
 tests/kit/               tests for the wrappers, hooks, stamp and config
 ```
