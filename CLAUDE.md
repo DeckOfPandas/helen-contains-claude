@@ -14,10 +14,16 @@ is the only enforcement.
 - **Scratch files go in this project's `tmp/`** (gitignored), never the system
   `/tmp`, never `~`.
 - <Project build / test / serve commands go here.>
-- **Serving for me to look at:** read `PORTS` in `.devcontainer/kit.env`
-  (`host:container` pairs), listen on `0.0.0.0:<container port>`, and give me
-  `http://localhost:<host port>/`, plus the `baseurl` from `_config.yml` for a
-  Jekyll site. No pair in `PORTS` means I can't reach it: ask me to add one.
+- **Show me a branch on a server; never ask me to pull and build.** Read
+  `PORTS` in `.devcontainer/kit.env` (`host:container` pairs), run `ss -ltn`
+  and take a free container port, serve your own worktree in the background on
+  `0.0.0.0:<container port>`, and give me `http://localhost:<host port>/`, plus
+  the `baseurl` from `_config.yml` for a Jekyll site. Never stop a server you
+  did not start. No free pair in `PORTS` means I can't reach it: ask me to add
+  one.
+- **Tests:** one test run at a time, never two. A green run proves only what
+  ran: an empty parametrisation reports as one skip, not as missing tests, so
+  never let a check return early because a scan came back empty.
 - Visual checks (Playwright on): `node tools/dev/shoot.js <base-url> <label>
   [--engine webkit] [--scheme dark] [--click <text>] [--type <text>] <page>...`
   writes `tmp/shots/` (WebKit is the engine nearest Safari), and
@@ -36,6 +42,9 @@ is the only enforcement.
   `tmp/` with every argument written out literally, run as `sh tmp/<name>.sh`.
   Programs go in files too: never `python3 -c` or `node -e`.
   `guard-unanalyzable-bash.py` and `guard-inline-script.py` enforce it.
+- **Every Bash `description` says what the call reads or writes, and where**
+  ("Read-only GitHub GET of PR 12's state"), not just its goal. A prompt I have
+  stopped reading guards nothing.
 - **Never `sed` or `awk`**, in any form. Use the Edit tool, or Python in a
   file. `guard-sed.py` and `guard-awk.py` enforce it.
 - **A command that must reach outside the working directory becomes a script
@@ -66,6 +75,10 @@ is the only enforcement.
 - **Never `git reset --hard`, `git checkout --`, `git restore` or `git clean -f`
   over a dirty tree without asking me.** `guard-destructive-git.py` enforces it.
   To set work aside, use `git stash push -u -m <tag>`.
+- **Never remove, prune or tidy an agent's worktree** under
+  `.claude/worktrees/`, even once its branch is merged: its `tmp/` is the
+  record of how the work was checked. `git worktree remove` and `prune` are
+  mine. Deleting a merged branch is fine.
 - **From a worktree, see my uncommitted edits in the main checkout** with
   `sh scripts/git-diff-main-checkout.sh` (`--stat`, or `--patch
   tmp/<name>.patch` for `git apply`).
@@ -84,7 +97,8 @@ is the only enforcement.
   `sh scripts/gh-read.sh repos/<owner>/<repo>/pulls/<N> --fields state,merged`.
 - Put `Fixes #N` in the commit, AND one closing line per issue in the PR
   description. A PR the bot account opens does not close issues from commit
-  messages alone.
+  messages alone. Name the issues you are about to close before pushing. A
+  bare `#N` resolves only in its own repo: elsewhere write `<owner>/<repo>#N`.
 
 ## GitHub
 - The agent account's token is `AGENT_GH_TOKEN`. It reaches only the
@@ -106,7 +120,9 @@ is the only enforcement.
   tense. No dates, no history, no "used to". The story goes in the commit
   message.
 - **When code changes, rewrite its comment.** Never append a paragraph beneath
-  the old one.
+  the old one. Delete the comment when its code goes. Before a comment names a
+  file, test or function, check it exists; never write a count a command can
+  print.
 - Name files, never line numbers, in documents and comments.
 
 ## Working with me
@@ -114,6 +130,7 @@ is the only enforcement.
   decision.
 - Do not trust a document over the code. If they disagree, the code wins and
   the document gets fixed.
-- When you finish, say what changed and where, what you verified and how,
-  which issues are touched, which PRs are waiting on me, and what is undone
-  and why.
+- My hours are mine. Never suggest stopping.
+- When you finish, say what changed and where, the local URL serving it, what
+  you verified and how, which issues are touched, which PRs are waiting on me,
+  and what is undone and why.
