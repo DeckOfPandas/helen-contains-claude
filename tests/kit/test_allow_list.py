@@ -51,11 +51,18 @@ REVIEWED_OPEN_RULES = {
     "Bash(sh scripts/git-diff-main-checkout.sh *)",
     # One https URL of plain characters; curl writes only to /dev/null.
     "Bash(sh scripts/check-link.sh *)",
+    # One optional repo name from GH_REPOS; a GET through gh-agent.sh.
+    "Bash(sh scripts/main-ci-status.sh *)",
+    # A NESTED_DIRS folder and a fixed list of verbs, hooks and external diff
+    # off, commit refused on main; tests/kit/test_git_nested.py pins it.
+    "Bash(sh scripts/git-nested.sh *)",
     # Arguments after the script name go to the script, never to node, so no
-    # node option can be slipped in. Both check their own arguments, write only
-    # under tmp/, and only ever read the URL or the tmp/ PNG they are given.
+    # node option can be slipped in. Each checks its own arguments, writes only
+    # under tmp/ or nothing, and only ever reads the URL or the tmp/ PNG given.
     "Bash(node tools/dev/shoot.js *)",
     "Bash(node tools/dev/slice-png.js *)",
+    "Bash(node tools/dev/crop.js *)",
+    "Bash(node tools/dev/styles.js *)",
 }
 
 
