@@ -178,6 +178,8 @@ def test_ground_truth_reports_branch(hooks, repo):
     ("guard-unanalyzable-bash.py", "(cd x)"),
     ("guard-unanalyzable-bash.py", "sh scripts/gh-read.sh repos/o/r --jq '[.a] | @tsv'"),
     ("guard-unanalyzable-bash.py", 'grep "$[a]" f'),
+    ("guard-unanalyzable-bash.py", "curl --proto =https --output tmp/x https://x"),
+    ("guard-unanalyzable-bash.py", "ls =python3"),
 ])
 def test_guard_refusals(hooks, tmp_path, hook, command):
     assert denied(run_hook(hooks / hook, command, tmp_path))
@@ -192,6 +194,9 @@ def test_guard_refusals(hooks, tmp_path, hook, command):
     ("guard-unanalyzable-bash.py", "git status 2>&1"),
     ("guard-unanalyzable-bash.py", "grep 'a|b' f"),
     ("guard-unanalyzable-bash.py", "git -c credential.helper=x push"),
+    ("guard-unanalyzable-bash.py", "curl --proto '=https' --output tmp/x https://x"),
+    ("guard-unanalyzable-bash.py", "git log --format=%h --since=yesterday"),
+    ("guard-unanalyzable-bash.py", "grep -n 'a = b' f"),
     ("guard-unanalyzable-bash.py", "echo '$(not run)'"),
     ("guard-unanalyzable-bash.py", "python3 -m json.tool f > /dev/null"),
     ("guard-unanalyzable-bash.py", "sh scripts/gh-read.sh 'repos/o/r?a=1&b=2' --fields a,b"),
