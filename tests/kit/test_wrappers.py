@@ -219,10 +219,14 @@ def test_bad_config_is_refused(project, conf):
     assert refused(run(project, "git-fetch-main.sh", conf=conf))
 
 
-def test_shipped_config_is_the_placeholder(kit_root, project):
+def test_shipped_config_is_the_placeholder_or_valid(kit_root, project):
+    # The kit ships the placeholder; a project made from it may commit its own.
     shipped = (kit_root / "scripts" / "github.conf").read_text()
     result = run(project, "git-fetch-main.sh", conf=shipped)
-    assert refused(result) and "placeholder" in result.stderr
+    if "GH_OWNER=your-org" in shipped:
+        assert refused(result) and "placeholder" in result.stderr
+    else:
+        ok(result)
 
 
 def test_local_config_replaces_the_committed_one(project):
