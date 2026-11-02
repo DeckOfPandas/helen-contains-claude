@@ -100,8 +100,8 @@ is the only enforcement.
 - **After a merge, check `main`:** `sh scripts/main-ci-status.sh [<repo>]`. A
   red `main` is the first thing to report, before the work you came for: where
   the suite gates a deploy, nothing merged after it ships.
-- **One PR per sitting, not one per topic.** Keep each topic as its own commit
-  and list the commits in the PR description.
+- **One PR per piece of work**: a feature, a fix, a data model change. Not
+  one per sitting, and not one per commit.
 - **Every PR's base is `main`.** Never stack PRs. Before pushing to a branch,
   read the PR's state:
   `sh scripts/gh-read.sh repos/<owner>/<repo>/pulls/<N> --fields state,merged`.
