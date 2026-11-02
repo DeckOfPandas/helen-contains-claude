@@ -17,7 +17,9 @@ There are easy togglable options for toolchains to include in the Docoker image.
   init-firewall.sh       optional default-deny egress allowlist
   requirements.txt       pip installs, when WITH_PY_REQS=1
   project.bashrc         project aliases, read live from the mount
-  container.bashrc       loads project.bashrc and host dotfiles, once per shell
+  container.bashrc       loads project.bashrc and host dotfiles, once per shell,
+                         and seeds Claude's memory on a new project
+  seed_memory.py         copies .claude/memory-seed/ into the memory, once
   devcontainer.json      VS Code Dev Containers, using the same image
   build_inputs_hash.py   the build stamp (see "Staying current")
   claude_code_latest.py  asks npm for the newest Claude Code
@@ -26,6 +28,11 @@ There are easy togglable options for toolchains to include in the Docoker image.
 .claude/
   settings.json          permissions + hooks
   hooks/                 guards (see .claude/hooks/README.md)
+  memory-seed/           notes a new project's Claude memory starts with: no
+                         `cd`, relative paths, complex commands as literal
+                         scripts, and the same rules passed to subagents.
+                         Copied once per config volume; delete one there and
+                         it stays deleted
 scripts/
   github.conf            placeholder template for github.local.conf (gitignored):
                          owner, repos, bot account, the wrappers' whole world
