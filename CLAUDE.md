@@ -25,7 +25,8 @@ is the only enforcement.
 - Reads outside the working directory are refused, except `/opt` and other
   agents' worktrees. Use `/dev/null` only as a redirection (`> /dev/null`,
   `2>/dev/null`, `< /dev/null`), which is never checked. As a command argument
-  it is a read outside and asks me.
+  (`curl -o /dev/null`) it is a read outside that no allow rule lifts:
+  name a file under `tmp/` instead. `guard-dev-null.py` enforces it.
 - **Paths are relative to the working directory.** No leading `cd`, no
   `git -C`, no absolute paths into the project.
 - **One plain command per Bash call.** Anything that needs a loop, a chain, a

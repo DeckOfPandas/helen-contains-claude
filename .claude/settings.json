@@ -9,8 +9,6 @@
       "/workspace/.claude/worktrees"
     ],
     "allow": [
-      "Read(//dev/null)",
-      "Edit(//dev/null)",
       "Bash(python3 -m pytest)",
       "Bash(python3 -m pytest -q)",
       "Bash(git status *)",
@@ -100,6 +98,12 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git-output.py\"",
             "timeout": 20,
             "statusMessage": "Checking git diff options"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-dev-null.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking /dev/null is only a redirection"
           },
           {
             "type": "command",
