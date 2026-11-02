@@ -101,6 +101,12 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-github-burst.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking for a burst of GitHub issues or PRs"
+          },
+          {
+            "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git-output.py\"",
             "timeout": 20,
             "statusMessage": "Checking git diff options"

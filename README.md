@@ -181,8 +181,9 @@ Use `--rebuild` when that matters.
 **Does:** it stops Claude, or a mistaken command it runs, from reading anything
 outside the project, structurally rather than by convention. With
 `--firewall`, it also stops traffic to hosts outside the allowlist. The hooks
-stop commits to `main`, destructive git on a dirty tree, and the common ways a
-token ends up printed.
+stop commits to `main`, destructive git on a dirty tree, the common ways a
+token ends up printed, and a burst of issues or PRs that would get the agent
+account flagged as spam.
 
 **Doesn't:** it is not a defence against a deliberate, sophisticated container
 escape. The threat model is an honest mistake. Also, the token is in the
