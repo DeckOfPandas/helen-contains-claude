@@ -5,8 +5,8 @@ Refused while `git status --porcelain` is not empty in the repository the
 command is aimed at: `git checkout -- <paths>`, `git checkout .`,
 `git checkout <path>` where the argument names something that exists,
 `git reset --hard`, `git clean -f`, and `git restore` unless it is `--staged`
-without `--worktree`. Refused whenever the stash list is not empty, clean tree
-or not: `git stash drop` and `git stash clear`.
+without `--worktree`. Refused whenever the stash list of that same repository
+is not empty, clean tree or not: `git stash drop` and `git stash clear`.
 
 Allowed on purpose: the first group on a clean tree, where nothing can be lost;
 `git stash`, `git stash pop` and `git restore --staged`; and any of these
@@ -154,7 +154,7 @@ def main() -> int:
 
     stash = STASH_DESTRUCTIVE.search(_strip(command))
     if stash:
-        entries = _git_lines(pathlib.Path.cwd(), "stash", "list")
+        entries = _git_lines(_repo_dir(_strip(command)), "stash", "list")
         if not entries:
             return 0
         return _deny(

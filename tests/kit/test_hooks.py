@@ -77,6 +77,35 @@ def test_stash_drop_with_no_stashes_passes(hooks, repo):
     assert not denied(run_hook(hooks / "guard-destructive-git.py", "git stash drop", repo))
 
 
+def stash_something(repo: Path) -> None:
+    (repo / "a.txt").write_text("one")
+    git(repo, "add", "a.txt")
+    git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "one")
+    (repo / "a.txt").write_text("two")
+    git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "stash", "push", "-q", "-m", "kept")
+
+
+@pytest.mark.parametrize("command", ["git stash drop", "git stash clear"])
+def test_stash_drop_with_stashes_is_refused(hooks, repo, command):
+    stash_something(repo)
+    assert denied(run_hook(hooks / "guard-destructive-git.py", command, repo))
+
+
+def test_stash_drop_asks_the_repo_it_targets(hooks, repo):
+    nested = repo / "nested"
+    nested.mkdir()
+    git(nested, "init", "-q", "-b", "main")
+    stash_something(nested)
+    guard = hooks / "guard-destructive-git.py"
+    assert denied(run_hook(guard, "git -C nested stash drop", repo))
+    assert not denied(run_hook(guard, "git stash drop", repo))
+    stash_something(repo)
+    other = repo / "other"
+    other.mkdir()
+    git(other, "init", "-q", "-b", "main")
+    assert not denied(run_hook(guard, "git -C other stash drop", repo))
+
+
 # --- guard-token-expansion -------------------------------------------------------------------
 
 @pytest.mark.parametrize("command", [
