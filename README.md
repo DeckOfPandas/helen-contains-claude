@@ -1,59 +1,99 @@
-# Helen Contains Claude: 
+# Helen Contains Claude
 
-This template repository is a Claude Code in Docker quickstart kit. 
+I built this kit to solve three problems:
 
-Only the project folder is mounted (at `/workspace`), so Claude can't read anything else on the host. There are also guard hooks for scary commands, an agent-account GitHub workflow, and a `CLAUDE.md` starter.
+1. I want Claude Code to work on my project but not on the rest of my machine.
+2. I want it to stop harassing me for permission to run commands that are obviously fine, such as the clearly baffling `ls -l tmp/`.
+3. I want it never to do something terrifying based on my response to a permissions request, because one
+   day, whether due to tiredness or prompt fatigue, I will say yes to a command resolving to `git reset --hard`, or to committing my GitHub keys to a public repository.
 
-There are easy togglable options for toolchains to include in the Docoker image. 
+The goal of this kit is to make it easy to set up a web project running Claude Code in Docker without having to solve the above three problems every time. The threat model is just honest mistakes, so complex projects will need to make other arrangements. In particular, the GitHub token is in the container's environment: the hooks make printing it hard, not impossible.
 
-## What's in the box
+## 1. Boundaries
 
-```
-.devcontainer/
-  run.sh                 build-if-stale, then start the container
-  kit.env                toggles: what goes in the image, ports, firewall extras
-  kit.local.example.env  a name kept out of git (see "Working on the kit itself")
-  Dockerfile             the image; every toggle is a build argument
-  init-firewall.sh       optional default-deny egress allowlist
-  requirements.txt       pip installs, when WITH_PY_REQS=1
-  project.bashrc         project aliases, read live from the mount
-  container.bashrc       loads project.bashrc and host dotfiles, once per shell,
-                         and seeds Claude's memory on a new project
-  seed_memory.py         copies .claude/memory-seed/ into the memory, once
-  devcontainer.json      VS Code Dev Containers, using the same image
-  build_inputs_hash.py   the build stamp (see "Staying current")
-  claude_code_latest.py  asks npm for the newest Claude Code
-  read_local_token.py    reads AGENT_GH_TOKEN for one docker run
-  set-project-name.py    sets PROJECT_NAME in kit.env and devcontainer.json
-.claude/
-  settings.json          permissions + hooks
-  hooks/                 guards (see .claude/hooks/README.md)
-  memory-seed/           notes a new project's Claude memory starts with: no
-                         `cd`, relative paths, complex commands as literal
-                         scripts, and the same rules passed to subagents.
-                         Copied once per config volume; delete one there and
-                         it stays deleted
-scripts/
-  github.conf            placeholder template for github.local.conf (gitignored):
-                         owner, repos, bot account, the wrappers' whole world
-  gh-*.sh, git-*-agent.sh, git-fetch-main.sh, github-public-status.sh
-  git-diff-main-checkout.sh  the main checkout's uncommitted changes, from a worktree
-  check-link.sh          does one https link resolve: status and final address
-  git-nested.sh          a fixed list of git verbs inside a nested clone named
-                         in NESTED_DIRS, hooks off
-  main-ci-status.sh      is CI on main green, running, cancelled or red
-                         (main_ci_status.py reads the answer)
-tools/dev/
-  shoot.js               full-page screenshots, phone and desktop, light or dark,
-                         Chromium or WebKit
-  slice-png.js           cuts a tall screenshot into readable pieces
-  crop.js                one element at 2x, with its box, optionally after typing
-  styles.js              each match's box and computed styles
-CLAUDE.md                rules starter: fill in <PROJECT> and the build commands
-tests/kit/               tests for the wrappers, hooks, stamp and config
-```
+**Container**
+- Only this project is mounted, at `/workspace`. My home directory isn't in the container, and so neither are my SSH keys.
+- Claude's login and config live in a Docker volume per project, not in my `~/.claude`.
+- It runs with my uid, so files come back owned by me, but never as root. `run.sh` won't start as root at all.
+- `sudo` works for exactly one command, which turns on the firewall. `chmod`, `chown` and `sudo` are denied in settings.
+- The container is `--rm`. Anything Claude installs mid-session is gone when I exit, which is the correct amount of time for a unit of my attention to exist.
+- My dotfiles go in read-only for quality of life (`MOUNT_DOTFILES`).
+- One container per project. A second `run.sh` is refused, so two Claudes
+  never fight over one working tree. Parallel sessions use git worktrees.
+- Ports are published only if I list them in `PORTS`.
 
-## Setting up a new project
+**Network** (`run.sh --firewall`)
+- Outbound traffic is dropped except to Anthropic, npm, GitHub, `storage.googleapis.com`, whatever my toggles need (rubygems, PyPI), and
+  anything I add to `EXTRA_ALLOWED_DOMAINS`.
+- The allowlist is baked into the image in a root-owned file, and the firewall script doesn't take arguments, so nothing inside can finagle its way onto the list.
+- It tests itself on start: example.com must fail, api.github.com must work.
+
+**Claude Code's own settings**
+- Reads outside the working directory are blocked. The only exceptions are `/opt` and other agents' worktrees.
+- `.env` files and `.claude/settings.local.json` can't be read.
+
+**GitHub access ish**
+- Claude pushes as a separate bot account, invited only to the repos I choose.
+- The token is read from `.claude/settings.local.json` into the container's environment for one `docker run`, and is never printed. Git gets it from a credential helper over a pipe, never from a URL or `.git/config`, and the helper ignores requests to save it.
+- Every wrapper checks the repo against `github.local.conf`. The file is parsed rather than sourced, so it can't run code or weaken a check.
+- `git-push-agent.sh` refuses to push to `main`, and to `master`, `refs/heads/main`, `+x:main` and the other spellings.
+- `gh-write.sh` opens PRs and issues and comments on them. It can't merge, approve, close, delete, or touch settings.
+- `gh-read.sh` sends GETs to my repos and nothing else. It refuses `env` in a jq expression, because gh's jq can read the environment the token lives in.
+
+## 2. Claude doesn't ask me about things that are obviously fine
+
+Most prompts are the permission checker failing to read a command and asking just in case, which teaches me to click
+Yes without reading. So:
+
+**A reviewed allow list for prompts**
+- Read-only git, `git add --`, `git commit -F`, pytest, the screenshot tools and every wrapper in `scripts/` run unasked.
+- A rule ending in ` *` accepts any arguments, so each one is a decision. `tests/kit/test_allow_list.py` fails on a new one until it joins a reviewed
+  set, with a note saying which of the tool's options I checked for running programs or writing files.
+
+**Wrappers for tools too powerful to allow**
+- `curl -o` writes anywhere, so there's no safe rule for `curl`.
+  `check-link.sh` and `github-public-status.sh` are curl with one job each.
+- `gh api` will merge a PR if asked nicely. `gh-read.sh` and `gh-write.sh` are the parts of it I want.
+- `cd` and `git -C` prompt every time. `git-nested.sh` (a short list of git commands inside a nested clone, hooks off) and `git-diff-main-checkout.sh`
+  replace them.
+- Every wrapper's refusals are tested, dry-run and offline.
+
+**Hooks that teach Claude to write readable commands**
+- Pipes, chains, `$(...)`, heredocs, globs, a leading `cd`, `python3 -c`, `node -e`, `sed` and `awk` are all refused. Each refusal says what to do
+  instead: usually a script in `tmp/` with every argument written out literally, which the checker can read, and so can I.
+- `/dev/null` is fine as a redirection but refused as an argument, because as an argument it counts as reading outside the project.
+- A new project's Claude memory starts with the same habits, plus a reminder to pass them on to subagents, who otherwise arrive knowing none of this.
+
+**Things Claude can check without me**
+- With `WITH_PLAYWRIGHT=1`, the image has Chromium and WebKit. Claude screenshots its own work, crops single elements and reads computed styles.
+- At session start, a hook tells Claude where it is: container or host, which branch, clean or dirty, ahead of or behind `main`. Fewer wrong assumptions, fewer silly questions for Helen.
+
+**An image I don't have to babysit**
+- The image rebuilds when the content of its inputs changes. Reverting an edit goes back to the image that already matches.
+- A new Claude Code release rebuilds only the last layer. Offline, the image starts as it is.
+- A typo in `kit.env` is treated as an error rather than a surprise default setting.
+
+## 3. Claude never asks me about scary things
+
+A dangerous command is not offered to me as a Yes/No question, flagged, queued or politely raised, only refused. Claude is told what to
+do instead.
+
+- Denied outright: `chmod`, `chown`, `sudo`, merging a PR, approving a PR.
+- No commits or merges on `main`.
+- No `reset --hard`, `checkout --`, `clean -f` or `restore` with uncommitted changes, and no `stash drop` or `stash clear` while stashes exist. On a clean tree they're allowed, because there's nothing to lose.
+- No printing secrets: no secret in `echo` or `printf`, no `${TOKEN:-x}` (which is the token, if set), no token in a URL, no literal `ghp_…`, no
+  `printenv`, no `env` in a gh call. It reads the scripts a command runs too, since every other guard sends Claude off to write scripts.
+- The git reads that run unasked can't write files or run programs: `--output`, `--no-index`, `--ext-diff` and `--textconv` are refused.
+- Wrappers refuse rather than ask: `refused -- <reason>`, exit 2.
+- One plain command per Bash call, and every description says what it reads or writes, and where. When I am asked, the question is short and says what the command does so it's simple for me to decide on.
+- Anything that has to reach outside the project is written to a script in `scripts/` with one fixed action, checked arguments, safety stated at
+  the top, and tests. It goes on the allow list only when I say so.
+- A recommendation to add a GitHub ruleset on `main`, for when everything above has somehow failed.
+- No bursts of issues or PRs to avoid GitHub flagging the account as spam. `guard-github-burst.py` allows one every 5 minutes, and 20 issues or 5 PRs a day, and none from inside a script, since a script can loop. `github-public-status.sh` checks whether it happened anyway: a page that's 404 logged out but 200 through the API.
+
+The mechanism behind each hook is in [`.claude/hooks/README.md`](.claude/hooks/README.md).
+
+## Getting started
 
 You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 
@@ -74,141 +114,62 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
    for the firewall, and `MOUNT_DOTFILES`.
 
 3. **GitHub agent account** (skip this step if Claude won't push):
-   - Create a separate GitHub account for the bot. Invite it as a
+   - Create a separate GitHub account for the bot and invite it as a
      collaborator on just the repos you want it to work in.
-   - Create it a classic PAT scoped to `repo`, and `workflow` if it
-     should edit `.github/workflows/`: without it, GitHub refuses any push
-     that touches a workflow file, and `git-push-agent.sh` says so.
-   - Paste the token in `.claude/settings.local.json`, which is gitignored. A
-     fresh project doesn't have that file yet, so copy the committed example
-     to it, leaving the example in place, then paste the token between the
-     quotes:
+   - Give it a classic PAT scoped to `repo`, plus `workflow` if it should
+     edit `.github/workflows/`.
+   - `cp .claude/settings.local.example.json .claude/settings.local.json`
+     (gitignored) and paste the token between the quotes. An empty value
+     means the container starts without one.
+   - `cp scripts/github.conf scripts/github.local.conf` (gitignored) and fill
+     in `GH_OWNER`, `GH_REPOS` (the first is the default), `GH_AGENT_USER`,
+     and `MAIN_PUSH_REPOS` if any repo may take direct pushes to `main`.
 
-         cp .claude/settings.local.example.json .claude/settings.local.json
-
-     `run.sh` reads the token for each `docker run` and never prints it. An
-     empty value means no token, and the container starts without one.
-   - Copy `scripts/github.conf` to `scripts/github.local.conf` (gitignored)
-     and fill that in: `GH_OWNER`, `GH_REPOS` (the first is the default),
-     `GH_AGENT_USER`, and `MAIN_PUSH_REPOS` if any repo may take direct
-     pushes to `main`. The wrappers read the local copy; from a worktree, they
-     read the main checkout's.
-   - Optionally, protect `main` with a ruleset as well. The wrappers refuse
-     to push there, but a ruleset is a belt for the braces.
-
-4. **Fill in `CLAUDE.md`**: the project name and the build/test commands. Add
+4. **Fill in `CLAUDE.md`**: the project name, the build/test commands, and
    any project rules.
 
 5. **Run it:**
 
        bash .devcontainer/run.sh            # or --firewall
-       claude                               # first time: log in (below)
+       claude
 
-   The first build takes a few minutes after you change anything.
+   The first build takes a few minutes, as does the first after a change.
+   The first `claude` asks you to log in. The login is kept in the project's
+   config volume, so it's once per project, not once per container.
 
-   On Windows, you probably need to set execute permissions for the script before it will run:
-       `chmod u+x .devcontainer/run.sh`
+`run.sh --rebuild` rebuilds from scratch, pulling the base image fresh.
+`--build-only` builds and stops. For VS Code, use Dev Containers →
+**Reopen in Container**: `devcontainer.json` runs `run.sh --build-only` first,
+so both routes use the same image.
 
+## When things bite
 
-### First login
-
-`claude`, then do the Claude login thing.
-
-### First deploy
-
-A GitHub Pages workflow (for example Jekyll's) builds but publishes nothing
-until you set the repository's **Settings → Pages → Source** to **GitHub
-Actions**. That is a repository setting, which the agent must not change, so
-it is yours to do once.
-
-## Using it
-
-- `bash .devcontainer/run.sh` starts the container. `--rebuild` rebuilds from
-  scratch, pulling the base image fresh. `--build-only` builds and stops.
-- **One container per project.** The fixed container name refuses a second
-  `run.sh`, so two Claudes never edit one working tree. To run several
-  sessions at once, use git worktrees inside the one container.
-- `run.sh` always mounts the primary clone, so all worktrees share one
-  container. It builds from the `.devcontainer/` it sits in, so to try a
-  branch's `kit.env` or Dockerfile before it is merged, run that worktree's
-  copy from the host:
-
-      bash .claude/worktrees/<name>/.devcontainer/run.sh
-- `.devcontainer/project.bashrc` holds project aliases. It is read from the
-  mount at shell start, so edits don't need a rebuild. A server must listen on
-  `0.0.0.0` to be reachable through a published port.
-
-### The firewall
-
-`run.sh --firewall` adds `NET_ADMIN`/`NET_RAW` and runs `init-firewall.sh`
-before the shell starts. Outbound traffic is then dropped except to:
-Anthropic, npm, GitHub, `storage.googleapis.com`, rubygems (when Ruby is on),
-PyPI (when the requirements toggle is on), and `EXTRA_ALLOWED_DOMAINS`. The
-list is written into the image at build time, in a root-owned file, so nothing
-inside the container can widen it. Hosts are resolved once at start; a
-rotating CDN can drop out mid-session, and re-running the script re-resolves
-them.
-
-### VS Code
-
-Dev Containers → **Reopen in Container**. `devcontainer.json` runs
-`run.sh --build-only` on the host first, then uses the same image, so the two
-routes cannot drift. Export `AGENT_GH_TOKEN` in the host shell VS Code starts
-from if the wrappers need it there. For the firewall, add
-`"runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW"]` and
-`"postStartCommand": "sudo /usr/local/bin/init-firewall.sh"`.
-
-## Staying current
-
-**The image is checked against the files on every start.** `run.sh` stamps
-each image with a SHA-256 of its build context and build arguments. When the
-stamp no longer matches, it rebuilds. The check compares content, not
-timestamps: `touch` costs nothing, and reverting an edit goes back to the image
-that already matches. Files in `.devcontainer/.dockerignore` (run.sh, kit.env's
-comments, these helpers) are outside the stamp, so editing them doesn't
-rebuild.
-
-**Claude Code updates by rebuild.** Every start asks npm for the newest
-version. If the image has an older one, only the last layer rebuilds. When
-offline, the image starts as it is. To pin a version for one run:
-`PIN_CLAUDE_CODE=2.1.0 bash .devcontainer/run.sh`.
-
-**What the stamp can't see:** the base image or apt packages moving upstream.
-Use `--rebuild` when that matters.
-
-## What this does and doesn't protect against
-
-**Does:** it stops Claude, or a mistaken command it runs, from reading anything
-outside the project, structurally rather than by convention. With
-`--firewall`, it also stops traffic to hosts outside the allowlist. The hooks
-stop commits to `main`, destructive git on a dirty tree, the common ways a
-token ends up printed, and a burst of issues or PRs that would get the agent
-account flagged as spam.
-
-**Doesn't:** it is not a defence against a deliberate, sophisticated container
-escape. The threat model is an honest mistake. Also, the token is in the
-container's environment: the hooks make printing it hard, not impossible.
-
-## Working on the kit itself
-
-The kit is a template, so what it commits is what every new project starts
-from. Keep the committed copies as placeholders (`PROJECT_NAME=changeme`,
-`your-org`, `<PROJECT>`) and put your own values in the gitignored local files:
-
-    cp .devcontainer/kit.local.example.env .devcontainer/kit.local.env   # PROJECT_NAME
-    cp scripts/github.conf scripts/github.local.conf                     # GitHub
-    cp .claude/settings.local.example.json .claude/settings.local.json   # token
-
-`tests/kit/` fails if `scripts/github.conf` holds anything but the
-placeholders. Nothing checks the name or `CLAUDE.md`'s title, because a
-project made from the kit commits its own.
+- **A push touching `.github/workflows/` is refused** by GitHub unless the
+  token has the `workflow` scope. The fix is a new token, not a retry.
+- **A Pages workflow publishes nothing** until you set the repository's
+  Settings → Pages → Source to GitHub Actions. The agent may not change
+  repository settings, so that one is yours.
+- **The firewall resolves hosts once**, at start. A CDN that rotates
+  addresses can drop out mid-session; `sudo /usr/local/bin/init-firewall.sh`
+  re-resolves.
+- **The base image and apt packages moving upstream** don't trigger a
+  rebuild. Use `--rebuild` when that matters.
+- **To pin Claude Code for one run:** `PIN_CLAUDE_CODE=2.1.0 bash .devcontainer/run.sh`.
+- **To try a branch's `kit.env` or Dockerfile** before merging, run that
+  worktree's copy from the host:
+  `bash .claude/worktrees/<name>/.devcontainer/run.sh`. It always mounts the
+  primary clone.
+- **A server must listen on `0.0.0.0`** to be reachable through a published port.
+- **VS Code and the token:** export `AGENT_GH_TOKEN` in the host shell VS
+  Code starts from. For the firewall, add
+  `"runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW"]` and
+  `"postStartCommand": "sudo /usr/local/bin/init-firewall.sh"` to
+  `devcontainer.json`.
 
 ## Tests
 
     python3 -m pytest
 
-These cover the wrappers' refusals (dry-run, no network), the hooks, the build
-stamp, and that `kit.env` and `devcontainer.json` agree. The image always has
-`pytest`, and Claude may run `python3 -m pytest` or `python3 -m pytest -q`
-unasked; anything with more arguments asks, because `--basetemp` empties the
-folder it is given.
+They cover the wrappers' refusals (dry-run, no network), the hooks, the build
+stamp and the config. Working on the kit itself, rather than a project made
+from it? See [`docs/maintaining-the-kit.md`](docs/maintaining-the-kit.md).
