@@ -90,6 +90,9 @@ is the only enforcement.
   **I review and merge. Claude never merges, approves or closes a PR as
   merged.** After I merge: fetch, delete the branch locally and remotely
   (`sh scripts/git-push-agent.sh :<branch>`), and branch afresh.
+- **After a merge, check `main`:** `sh scripts/main-ci-status.sh [<repo>]`. A
+  red `main` is the first thing to report, before the work you came for: where
+  the suite gates a deploy, nothing merged after it ships.
 - **One PR per sitting, not one per topic.** Keep each topic as its own commit
   and list the commits in the PR description.
 - **Every PR's base is `main`.** Never stack PRs. Before pushing to a branch,

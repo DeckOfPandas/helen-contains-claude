@@ -39,6 +39,8 @@ scripts/
   gh-*.sh, git-*-agent.sh, git-fetch-main.sh, github-public-status.sh
   git-diff-main-checkout.sh  the main checkout's uncommitted changes, from a worktree
   check-link.sh          does one https link resolve: status and final address
+  main-ci-status.sh      is CI on main green, running, cancelled or red
+                         (main_ci_status.py reads the answer)
 tools/dev/
   shoot.js               full-page screenshots, phone and desktop, light or dark,
                          Chromium or WebKit
