@@ -11,6 +11,7 @@ from conftest import denied, run_hook
 
 HOUR = 60 * 60
 CREATE_PR = 'sh scripts/gh-write.sh pr-create site feat "Title" tmp/body.md'
+CREATE_ISSUE = 'sh scripts/gh-write.sh issue-create site "Title" tmp/body.md'
 
 
 @pytest.fixture
@@ -34,11 +35,12 @@ def log_file(config: Path) -> Path:
     return config / "claude-kit" / "github-creations.log"
 
 
-def seed(config: Path, *ages: float) -> None:
-    """Log one past creation per age, in seconds before now."""
+def seed(config: Path, *ages: float, kind: str = "issue") -> None:
+    """Log one past creation of `kind` per age, in seconds before now."""
     log_file(config).parent.mkdir(parents=True, exist_ok=True)
     now = time.time()
-    log_file(config).write_text("".join(f"{int(now - age)} issue\n" for age in ages))
+    with log_file(config).open("a") as handle:
+        handle.write("".join(f"{int(now - age)} {kind}\n" for age in ages))
 
 
 def check(guard: Path, project: Path, config: Path, command: str) -> dict | None:
@@ -83,26 +85,33 @@ def test_other_github_calls_are_not_counted(guard, project, config, command):
     assert logged(config) == 20
 
 
-def test_the_fourth_creation_in_an_hour_is_refused(guard, project, config):
-    for _ in range(3):
-        assert not denied(check(guard, project, config, CREATE_PR))
-    verdict = check(guard, project, config, CREATE_PR)
+def reason(verdict: dict | None) -> str:
     assert denied(verdict)
-    reason = verdict["hookSpecificOutput"]["permissionDecisionReason"]
-    assert "checklist" in reason and "minute" in reason, reason
-    assert logged(config) == 3, "a refused creation must not be counted"
+    return verdict["hookSpecificOutput"]["permissionDecisionReason"]
 
 
-def test_creations_older_than_an_hour_leave_the_hourly_count(guard, project, config):
-    seed(config, HOUR + 60, HOUR + 120, HOUR + 180)
+def test_a_second_creation_within_five_minutes_is_refused(guard, project, config):
+    assert not denied(check(guard, project, config, CREATE_PR))
+    why = reason(check(guard, project, config, CREATE_ISSUE))
+    assert "checklist" in why and "5 minutes" in why, why
+    assert logged(config) == 1, "a refused creation must not be counted"
+
+
+def test_a_creation_after_five_minutes_passes(guard, project, config):
+    seed(config, 5 * 60 + 10)
     assert not denied(check(guard, project, config, CREATE_PR))
 
 
-def test_the_eleventh_creation_in_a_day_is_refused(guard, project, config):
-    seed(config, *[2 * HOUR + n * 60 for n in range(10)])
-    verdict = check(guard, project, config, CREATE_PR)
-    assert denied(verdict)
-    assert "24 hours" in verdict["hookSpecificOutput"]["permissionDecisionReason"]
+def test_the_twenty_first_issue_in_a_day_is_refused_but_a_pr_passes(guard, project, config):
+    seed(config, *[HOUR + n * 60 for n in range(20)])
+    assert "24 hours" in reason(check(guard, project, config, CREATE_ISSUE))
+    assert not denied(check(guard, project, config, CREATE_PR))
+
+
+def test_the_sixth_pr_in_a_day_is_refused_but_an_issue_passes(guard, project, config):
+    seed(config, *[HOUR + n * 60 for n in range(5)], kind="PR")
+    assert "PR" in reason(check(guard, project, config, CREATE_PR))
+    assert not denied(check(guard, project, config, CREATE_ISSUE))
 
 
 def test_creations_older_than_a_day_are_forgotten(guard, project, config):
@@ -118,9 +127,9 @@ def test_an_unreadable_log_line_is_dropped(guard, project, config):
     assert logged(config) == 1
 
 
-def test_two_creations_in_one_command_count_twice(guard, project, config):
-    seed(config, 60, 120)
+def test_two_creations_in_one_command_are_refused(guard, project, config):
     assert denied(check(guard, project, config, f"{CREATE_PR}; gh issue create"))
+    assert logged(config) == 0
 
 
 @pytest.mark.parametrize("body", [

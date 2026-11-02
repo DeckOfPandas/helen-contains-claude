@@ -2,9 +2,10 @@
 """Refuse a burst of GitHub issue or PR creations.
 
 GitHub flags an account that creates many issues or PRs in a short time as
-spam, and then hides everything it ever wrote from everyone else. This counts
-creations and refuses one that would go over MAX_PER_HOUR in the last hour or
-MAX_PER_DAY in the last 24 hours.
+spam, and then hides everything it ever wrote from everyone else. This logs
+creations and refuses one within MIN_GAP of the last, or one that would make
+more than MAX_ISSUES_PER_DAY issues or MAX_PRS_PER_DAY PRs in 24 hours. The
+gap counts issues and PRs together. A command that creates two is refused.
 
 A creation is any of: `scripts/gh-write.sh pr-create` or `issue-create`;
 `issue create` or `pr create` through `scripts/gh-agent.sh` or bare `gh`; and
@@ -12,8 +13,9 @@ A creation is any of: `scripts/gh-write.sh pr-create` or `issue-create`;
 Comments, labels and PR body edits are not counted.
 
 A creation inside a script the command runs (`sh tmp/x.sh`), other than the
-two wrappers above, is refused outright: a script can loop, so the count it would add is unknowable. A
-creation is always one direct call, and the wrappers run without asking.
+two wrappers above, is refused outright: a script can loop, so the count it
+would add is unknowable. A creation is always one direct call, and the
+wrappers run without asking.
 
 The log is CREATION_LOG under the Claude Code config directory, so every
 session and worktree in the container shares one count, it survives a restart
@@ -32,10 +34,10 @@ import re
 import sys
 import time
 
-MAX_PER_HOUR = 3
-MAX_PER_DAY = 10
-HOUR = 60 * 60
-DAY = 24 * HOUR
+MIN_GAP = 5 * 60
+MAX_ISSUES_PER_DAY = 20
+MAX_PRS_PER_DAY = 5
+DAY = 24 * 60 * 60
 CREATION_LOG = os.path.join("claude-kit", "github-creations.log")
 
 _GH = r"(?:^|[\s/;&|(`])"
@@ -129,41 +131,49 @@ def _deny(reason: str) -> int:
 
 BATCH_ADVICE = (
     "CLAUDE.md: never create issues or PRs in a burst. A batch is ONE issue "
-    "with a checklist, and a sitting's work is ONE PR with a commit per topic."
+    "with a checklist, and a piece of work is ONE PR."
+)
+SPAM = (
+    "GitHub flags a burst as spam and then hides everything the account ever "
+    "wrote."
 )
 
 
 def judge(kinds: list[str], now: float) -> str | None:
     """Count `kinds` against the log; a refusal, or None once recorded."""
+    if len(kinds) > 1:
+        return (
+            f"BLOCKED: this one command creates {len(kinds)} GitHub issues or "
+            f"PRs; the limit is one every {MIN_GAP // 60} minutes. {SPAM}\n\n"
+            f"{BATCH_ADVICE}\n\nWHAT TO DO NOW: make one creation per call."
+        )
     path = log_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a+", encoding="utf-8") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
         handle.seek(0)
         entries = _recent(handle.read().splitlines(), now)
-        last_hour = [stamp for stamp, _ in entries if stamp > now - HOUR]
-        if len(last_hour) + len(kinds) > MAX_PER_HOUR:
-            frees = min(last_hour) + HOUR - now if last_hour else 0
+        latest = max((stamp for stamp, _ in entries), default=None)
+        if latest is not None and now - latest < MIN_GAP:
             return (
-                f"BLOCKED: this would be creation number "
-                f"{len(last_hour) + len(kinds)} on GitHub in the last hour; "
-                f"the limit is {MAX_PER_HOUR}. GitHub flags a burst as spam "
-                "and then hides everything the account ever wrote.\n\n"
-                f"{BATCH_ADVICE}\n\nWHAT TO DO NOW: fold this into an issue or "
-                "PR that already exists, or tell the human and wait. The next "
-                f"slot opens in about {_when(frees)}."
+                f"BLOCKED: a GitHub issue or PR was created less than "
+                f"{MIN_GAP // 60} minutes ago, and the limit is one every "
+                f"{MIN_GAP // 60} minutes. {SPAM}\n\n{BATCH_ADVICE}\n\n"
+                "WHAT TO DO NOW: fold this into an issue or PR that already "
+                "exists, or wait. The next slot opens in about "
+                f"{_when(latest + MIN_GAP - now)}."
             )
-        if len(entries) + len(kinds) > MAX_PER_DAY:
-            frees = min(stamp for stamp, _ in entries) + DAY - now
+        kind = kinds[0]
+        limit = MAX_PRS_PER_DAY if kind == "PR" else MAX_ISSUES_PER_DAY
+        same = [stamp for stamp, logged in entries if logged == kind]
+        if len(same) >= limit:
             return (
-                f"BLOCKED: this would be creation number "
-                f"{len(entries) + len(kinds)} on GitHub in the last 24 hours; "
-                f"the limit is {MAX_PER_DAY}. GitHub flags a burst as spam "
-                "and then hides everything the account ever wrote.\n\n"
+                f"BLOCKED: {len(same)} {kind}s have been created on GitHub in "
+                f"the last 24 hours, and the limit is {limit}. {SPAM}\n\n"
                 f"{BATCH_ADVICE}\n\nWHAT TO DO NOW: tell the human. The next "
-                f"slot opens in about {_when(frees)}."
+                f"{kind} slot opens in about {_when(min(same) + DAY - now)}."
             )
-        entries.extend((now, kind) for kind in kinds)
+        entries.append((now, kind))
         handle.seek(0)
         handle.truncate()
         handle.write("".join(f"{int(stamp)} {kind}\n" for stamp, kind in entries))
