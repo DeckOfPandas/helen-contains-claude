@@ -10,6 +10,7 @@ run as `python3 <path>`, so none needs an execute bit. All are wired in
 | `guard-main-branch.py` | PreToolUse Bash | Refuses `git commit` / `git merge` on `main` or `master` |
 | `guard-destructive-git.py` | PreToolUse Bash | Refuses `reset --hard`, `checkout --`, `clean -f`, `restore` on a dirty tree; `stash drop/clear` while stashes exist |
 | `guard-token-expansion.py` | PreToolUse Bash | Refuses commands that would print a secret, embed one in a URL, or dump the environment |
+| `guard-github-burst.py` | PreToolUse Bash | Refuses an issue or PR creation over 3 in an hour or 10 in 24 hours, counted in the Claude config volume across sessions and worktrees; refuses any creation inside a script, since a script can loop |
 | `guard-git-output.py` | PreToolUse Bash | Refuses `--output`, `--no-index`, `--ext-diff` and `--textconv` (and prefixes of them) after `git diff`/`log`/`show`, which the allow list lets run unasked as reads |
 | `guard-dev-null.py` | PreToolUse Bash | Refuses `/dev/null` as a command argument (`ls /dev/null`, `curl -o /dev/null`), which `blockReadsOutsideWorkingDirectories` turns into a prompt; a redirection to it passes |
 | `guard-unanalyzable-bash.py` | PreToolUse Bash | Refuses what the permission checker cannot read statically: heredocs, `$(...)` and backticks, pipes, `&&`/`\|\|`/`;` chains, a lone `&`, globs, a leading `cd`, `git -C`, a leading `NAME=value`, unquoted parentheses, `$[`, an unquoted word starting with `=`, and a quoted `[`/`]`/`\|` in a `sh scripts/...` call |

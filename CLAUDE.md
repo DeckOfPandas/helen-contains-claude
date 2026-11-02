@@ -120,7 +120,7 @@ is the only enforcement.
   whether it works, use it and read the 401/403.
 - **Never create issues or PRs in a burst.** Many creations in an hour get the
   account flagged as spam, and GitHub then hides everything it ever wrote. A
-  batch is ONE issue with a checklist.
+  batch is ONE issue with a checklist. `guard-github-burst.py` enforces it.
 - Never change repository settings, secrets, Actions settings or collaborators.
   A Pages workflow publishes nothing until I set Settings → Pages → Source to
   GitHub Actions: when you add one, say so in the PR description.
