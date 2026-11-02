@@ -8,12 +8,15 @@
 #   sh scripts/gh-write.sh pr-body      <repo> <number> tmp/<body>.md
 #   sh scripts/gh-write.sh comment      <repo> <number> tmp/<body>.md
 #   sh scripts/gh-write.sh issue-create <repo> "<title>" tmp/<body>.md [<label>]
+#   sh scripts/gh-write.sh issue-label  <repo> <number> <label>
 #   sh scripts/gh-write.sh label-create <repo> <label> <rrggbb>
 #
 # <repo> is a bare name from GH_REPOS in the GitHub config. A PR's base is
-# always main and its head never is. `comment` takes an issue or PR number. A
-# label is letters, digits, dots, dashes and underscores; a colour is six hex
-# digits with no #. One label per issue, and never issues in a burst.
+# always main and its head never is. `comment` and `issue-label` take an
+# issue or PR number. A label is letters, digits, dots, dashes and underscores;
+# a colour is six hex digits with no #. `issue-label` adds one label that
+# already exists and removes none. One label per issue, and never issues in
+# a burst.
 #
 # It cannot merge, approve, close, delete, change a title or state, or touch
 # settings. Prints the login GitHub recorded, so the author is read, not assumed.
@@ -24,7 +27,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 . "$here/_github_conf.sh"
 load_conf
 
-usage="usage: sh scripts/gh-write.sh pr-create <repo> <branch> \"<title>\" tmp/<body>.md | pr-body <repo> <number> tmp/<body>.md | comment <repo> <number> tmp/<body>.md | issue-create <repo> \"<title>\" tmp/<body>.md [<label>] | label-create <repo> <label> <rrggbb>"
+usage="usage: sh scripts/gh-write.sh pr-create <repo> <branch> \"<title>\" tmp/<body>.md | pr-body <repo> <number> tmp/<body>.md | comment <repo> <number> tmp/<body>.md | issue-create <repo> \"<title>\" tmp/<body>.md [<label>] | issue-label <repo> <number> <label> | label-create <repo> <label> <rrggbb>"
 
 check_label() {
   case "$1" in
@@ -114,6 +117,15 @@ case "$action" in
         -f "title=$2" -F "body=@$3" \
         --jq '[.number, .html_url, .user.login] | @tsv'
     fi
+    ;;
+  issue-label)
+    [ "$#" -eq 3 ] || refuse "$usage"
+    check_repo "$1"
+    check_number "$2"
+    check_label "$3"
+    set -- sh "$here/gh-agent.sh" api --method POST "repos/$GH_OWNER/$1/issues/$2/labels" \
+      -f "labels[]=$3" \
+      --jq '[.[].name] | @tsv'
     ;;
   label-create)
     [ "$#" -eq 3 ] || refuse "$usage"

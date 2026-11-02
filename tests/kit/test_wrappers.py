@@ -175,6 +175,11 @@ def test_label_create(project):
     assert "repos/acme/drafts/labels" in out and "name=parked" in out and "color=9a9a9a" in out
 
 
+def test_issue_label(project):
+    out = ok(run(project, "gh-write.sh", "issue-label", "site", "5", "parked"))
+    assert "repos/acme/site/issues/5/labels" in out and "labels[]=parked" in out and "POST" in out
+
+
 @pytest.mark.parametrize("args", [
     ["issue-create", "other", "T", "tmp/body.md"],
     ["issue-create", "site", "", "tmp/body.md"],
@@ -187,6 +192,13 @@ def test_label_create(project):
     ["label-create", "site", "parked", "gggggg"],
     ["label-create", "site", "a;b", "9a9a9a"],
     ["label-create", "other", "parked", "9a9a9a"],
+    ["issue-label", "site", "05", "parked"],
+    ["issue-label", "site", "x", "parked"],
+    ["issue-label", "site", "5", "two words"],
+    ["issue-label", "site", "5", "-x"],
+    ["issue-label", "other", "5", "parked"],
+    ["issue-label", "site", "5"],
+    ["issue-label", "site", "5", "parked", "more"],
 ])
 def test_issue_and_label_refusals(project, args):
     assert refused(run(project, "gh-write.sh", *args))
