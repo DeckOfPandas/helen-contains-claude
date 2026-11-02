@@ -217,6 +217,29 @@ def test_public_status_refusals(project, url):
     assert refused(run(project, "github-public-status.sh", url))
 
 
+# --- check a link -----------------------------------------------------------------
+
+@pytest.mark.parametrize("url", ["https://example.org/page", "https://www.gov.uk/a/b?c=1&d=2#e",
+                                 "https://web.archive.org/web/20250323181601/https://ahdb.org.uk/news/x"])
+def test_check_link_ok(project, url):
+    out = ok(run(project, "check-link.sh", url))
+    assert out[-1] == url
+    assert "/dev/null" in out and "--location" in out and "--proto" in out
+
+
+@pytest.mark.parametrize("url", ["http://example.org", "ftp://example.org", "example.org",
+                                 "https://user@example.org", "https://example.org/../x",
+                                 "https://example.org/a b", "https://example.org/$(id)",
+                                 "https://example.org/x;rm", ""])
+def test_check_link_refusals(project, url):
+    assert refused(run(project, "check-link.sh", url))
+
+
+def test_check_link_takes_one_url(project):
+    assert refused(run(project, "check-link.sh", "https://a.org", "https://b.org"))
+    assert refused(run(project, "check-link.sh"))
+
+
 # --- config parsing ---------------------------------------------------------------
 
 @pytest.mark.parametrize("conf", [

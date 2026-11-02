@@ -49,6 +49,8 @@ REVIEWED_OPEN_RULES = {
     "Bash(sh scripts/git-fetch-agent.sh *)",
     "Bash(sh scripts/git-clone-agent.sh *)",
     "Bash(sh scripts/git-diff-main-checkout.sh *)",
+    # One https URL of plain characters; curl writes only to /dev/null.
+    "Bash(sh scripts/check-link.sh *)",
     # Arguments after the script name go to the script, never to node, so no
     # node option can be slipped in. Both check their own arguments, write only
     # under tmp/, and only ever read the URL or the tmp/ PNG they are given.

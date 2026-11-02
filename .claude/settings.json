@@ -33,6 +33,7 @@
       "Bash(sh scripts/gh-read.sh *)",
       "Bash(sh scripts/gh-write.sh *)",
       "Bash(sh scripts/github-public-status.sh *)",
+      "Bash(sh scripts/check-link.sh *)",
       "Bash(sh scripts/gh-agent.sh issue list *)",
       "Bash(sh scripts/gh-agent.sh issue view *)",
       "Bash(sh scripts/gh-agent.sh issue comment *)",
