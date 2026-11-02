@@ -85,6 +85,10 @@ is the only enforcement.
 - **From a worktree, see my uncommitted edits in the main checkout** with
   `sh scripts/git-diff-main-checkout.sh` (`--stat`, or `--patch
   tmp/<name>.patch` for `git apply`).
+- **Git inside a nested clone** (a folder in `NESTED_DIRS` in the GitHub
+  config) is `sh scripts/git-nested.sh <dir> <verb>`: `status`, `diff`, `log`,
+  `show`, `branch --show-current`, `checkout -b`, `add --`, `commit -F tmp/...`.
+  The branch check before a commit is still its own call.
 - **Update main without checking it out:** `sh scripts/git-fetch-main.sh`, then
   `git merge origin/main`.
 - **The workflow:** push the branch with

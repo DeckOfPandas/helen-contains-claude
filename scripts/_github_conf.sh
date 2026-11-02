@@ -50,6 +50,7 @@ load_conf() {
   GH_REPOS=""
   GH_AGENT_USER=""
   MAIN_PUSH_REPOS=""
+  NESTED_DIRS=""
   conf="$(conf_path)"
   conf_name="${conf##*/}"
   [ -f "$conf" ] || refuse "$conf is missing"
@@ -70,6 +71,7 @@ load_conf() {
       GH_REPOS) GH_REPOS="$value" ;;
       GH_AGENT_USER) GH_AGENT_USER="$value" ;;
       MAIN_PUSH_REPOS) MAIN_PUSH_REPOS="$value" ;;
+      NESTED_DIRS) NESTED_DIRS="$value" ;;
       *) refuse "$conf_name:unknown key '$key'" ;;
     esac
   done < "$conf"
@@ -90,6 +92,11 @@ load_conf() {
   # shellcheck disable=SC2086
   for repo in $MAIN_PUSH_REPOS; do
     in_list "$repo" $GH_REPOS || refuse "$conf_name:MAIN_PUSH_REPOS names '$repo', which is not in GH_REPOS"
+  done
+  for dir in $NESTED_DIRS; do
+    case "$dir" in
+      -* | .* | *[!A-Za-z0-9._-]*) refuse "$conf_name:NESTED_DIRS '$dir' is not one folder name in this checkout" ;;
+    esac
   done
   # shellcheck disable=SC2086
   set -- $GH_REPOS
