@@ -327,6 +327,40 @@ def test_check_link_takes_one_url(project):
     assert refused(run(project, "check-link.sh"))
 
 
+# --- part of the suite ------------------------------------------------------------
+
+@pytest.mark.parametrize("args", [
+    ["tests/kit/test_wrappers.py"],
+    ["-q", "-x", "tests/kit/test_hooks.py::test_guard_passes", "tests/kit/"],
+    ["-k", "label and not create", "tests/kit/test_wrappers.py"],
+    ["-v", "tests/test_site.py", "-k", "food"],
+])
+def test_pytest_runs_named_tests_with_the_arguments_unchanged(project, args):
+    assert ok(run(project, "pytest.sh", *args)) == ["python3", "-m", "pytest", *args]
+
+
+@pytest.mark.parametrize("args", [
+    [],
+    ["-q"],
+    ["--basetemp=.", "tests/x.py"],
+    ["tests/x.py", "--basetemp", "."],
+    ["-p", "evil", "tests/x.py"],
+    ["--rootdir=/", "tests/x.py"],
+    ["-c", "/etc/x.ini", "tests/x.py"],
+    ["tests/../scripts/x.py"],
+    ["/workspace/tests/x.py"],
+    ["src/test_x.py"],
+    ["tests/x.py[a]"],
+    ["tests/x.py", "-k"],
+    ["-k", "a(b)", "tests/x.py"],
+    ["-k", "--basetemp=.", "tests/x.py"],
+    ["-k", "", "tests/x.py"],
+    ["tests/x.py", "--end--", "--basetemp=."],
+])
+def test_pytest_refuses_anything_it_cannot_check(project, args):
+    assert refused(run(project, "pytest.sh", *args))
+
+
 # --- config parsing ---------------------------------------------------------------
 
 @pytest.mark.parametrize("conf", [

@@ -27,7 +27,10 @@ project. A project's own rules, and any it sets against these, are in its
   the `baseurl` from `_config.yml` for a Jekyll site. Never stop a server you
   did not start. No free pair in `PORTS` means I can't reach it: ask me to add
   one.
-- **Tests:** one test run at a time, never two. A green run proves only what
+- **Tests:** one test run at a time, never two. The whole suite is
+  `python3 -m pytest`; part of it is `sh scripts/pytest.sh [-q] [-x] [-v]
+  [-k <expr>] tests/<path>...`, never `python3 -m pytest <args>`, which asks
+  me. A green run proves only what
   ran: an empty parametrisation reports as one skip, not as missing tests, so
   never let a check return early because a scan came back empty.
 - Visual checks (Playwright on): `node tools/dev/shoot.js <base-url> <label>

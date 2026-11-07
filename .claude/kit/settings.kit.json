@@ -11,6 +11,7 @@
     "allow": [
       "Bash(python3 -m pytest)",
       "Bash(python3 -m pytest -q)",
+      "Bash(sh scripts/pytest.sh *)",
       "Bash(python3 tools/kit/build.py)",
       "Bash(python3 tools/kit/build.py --check)",
       "Bash(python3 tools/kit/sync.py)",
