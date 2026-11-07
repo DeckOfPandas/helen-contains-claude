@@ -119,6 +119,15 @@ def test_merging_and_approving_stay_denied():
         assert rule in deny, f"{rule} left the deny list"
 
 
+def test_the_github_config_cannot_be_edited():
+    """scripts/github.local.conf lists the repos the wrappers may act on, so a
+    session that could edit it could widen its own reach."""
+    deny = set(_rules("deny"))
+    for tool in ("Edit", "Write"):
+        for path in ("./scripts/github.local.conf", "//workspace/scripts/github.local.conf"):
+            assert f"{tool}({path})" in deny, f"{tool}({path}) left the deny list"
+
+
 def test_no_allow_rule_lets_curl_choose_where_to_write():
     """`curl -o <path>` writes anywhere, and a rule ending ` *` accepts it."""
     for rule in _rules("allow"):
