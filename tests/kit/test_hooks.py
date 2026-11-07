@@ -180,6 +180,9 @@ def test_ground_truth_reports_branch(hooks, repo):
     ("guard-unanalyzable-bash.py", 'grep "$[a]" f'),
     ("guard-unanalyzable-bash.py", "curl --proto =https --output tmp/x https://x"),
     ("guard-unanalyzable-bash.py", "ls =python3"),
+    # Both reached the human as prompts: the checker reads `|=name` inside quotes.
+    ("guard-unanalyzable-bash.py", 'grep -rnE "proto|=cmd|lone" tests/x.py'),
+    ("guard-unanalyzable-bash.py", "grep -n -E 'proto|equals|=https' tests/x.py"),
 ])
 def test_guard_refusals(hooks, tmp_path, hook, command):
     assert denied(run_hook(hooks / hook, command, tmp_path))
@@ -197,6 +200,9 @@ def test_guard_refusals(hooks, tmp_path, hook, command):
     ("guard-unanalyzable-bash.py", "curl --proto '=https' --output tmp/x https://x"),
     ("guard-unanalyzable-bash.py", "git log --format=%h --since=yesterday"),
     ("guard-unanalyzable-bash.py", "grep -n 'a = b' f"),
+    ("guard-unanalyzable-bash.py", 'test "$a" = b'),
+    ("guard-unanalyzable-bash.py", "grep -n 'proto=https' f"),
+    ("guard-unanalyzable-bash.py", "grep -n -E 'a|= b' f"),
     ("guard-unanalyzable-bash.py", "echo '$(not run)'"),
     ("guard-unanalyzable-bash.py", "python3 -m json.tool f > /dev/null"),
     ("guard-unanalyzable-bash.py", "sh scripts/gh-read.sh 'repos/o/r?a=1&b=2' --fields a,b"),
