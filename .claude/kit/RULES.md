@@ -19,7 +19,8 @@ project. A project's own rules, and any it sets against these, are in its
   I run that worktree's `.devcontainer/run.sh` from the host, or after merge.
   Tell me which.
 - **Scratch files go in this project's `tmp/`** (gitignored), never the system
-  `/tmp`, never `~`.
+  `/tmp`, never `~`, and never `$CLAUDE_JOB_DIR` or the jobs folder that
+  background-job tooling suggests.
 - **Show me a branch on a server; never ask me to pull and build.** Read
   `PORTS` in `.devcontainer/kit.env` (`host:container` pairs), run `ss -ltn`
   and take a free container port, serve your own worktree in the background on
@@ -54,8 +55,15 @@ project. A project's own rules, and any it sets against these, are in its
 - **One plain command per Bash call.** Anything that needs a loop, a chain, a
   pipe, or a variable or `$(...)` expanded into a command goes in a script in
   `tmp/` with every argument written out literally, run as `sh tmp/<name>.sh`.
-  Programs go in files too: never `python3 -c` or `node -e`.
-  `guard-unanalyzable-bash.py` and `guard-inline-script.py` enforce it.
+  Programs go in files too: never `python3 -c` or `node -e`. Keep `=` off
+  the start of a word or a regex alternative (`'a|=b'`), quoted or not: the
+  checker reads it as zsh's `=cmd` and asks me. To find text in a file, the
+  Read tool asks nothing. `guard-unanalyzable-bash.py` and
+  `guard-inline-script.py` enforce it.
+- **A subagent you brief gets these rules from you**: one plain command per
+  call, relative paths because it is already in the root, no `cd`, cleverness
+  in a `tmp/` file. A brief that names an absolute working directory gets that
+  path typed into its commands, and every one asks me.
 - **Every Bash `description` says what the call reads or writes, and where**
   ("Read-only GitHub GET of PR 12's state"), not just its goal. A prompt I have
   stopped reading guards nothing.
@@ -65,6 +73,13 @@ project. A project's own rules, and any it sets against these, are in its
   in `scripts/`** with one fixed action and validated arguments, its safety
   stated in its header, and dry-run tests. Ask me before allowing it in
   `.claude/settings.json`. `scripts/git-diff-main-checkout.sh` is the model.
+- **An allow rule is only as narrow as what it lets through.** Before adding
+  one, ask what the prompt it removes was the last guard of: a rule ending
+  ` *` accepts any option, and `git clone --template=`, `node --import` and
+  `curl -o <path>` run a program or write anywhere.
+- **Never conclude a permission rule does nothing from one tool's refusal.**
+  An allow rule, a deny rule and the read block are different mechanisms;
+  find which one refused before changing any of them.
 
 ## The kit
 - **Never edit a kit-owned file in a project.** `.claude/kit/kit.lock` lists
@@ -99,7 +114,8 @@ project. A project's own rules, and any it sets against these, are in its
   already happened.
 - Commit freely. Write the message to a file: `git commit -F tmp/msg.txt`.
 - A commit subject starts with a prefix: `(feature)`, `(fix)`, `(styling)`,
-  `(design)`, `(data)`, `(docs)`, `(refactor)`, `(test)` or `(chore)`.
+  `(design)`, `(data)`, `(docs)`, `(refactor)`, `(test)`, `(devops)` (the
+  container, CI, hooks and wrappers) or `(chore)`.
 - **Never `git reset --hard`, `git checkout --`, `git restore` or `git clean -f`
   over a dirty tree without asking me.** `guard-destructive-git.py` enforces it.
   To set work aside, use `git stash push -u -m <tag>`.
@@ -139,13 +155,18 @@ project. A project's own rules, and any it sets against these, are in its
 - The agent account's token is `AGENT_GH_TOKEN`. It reaches only the
   repositories in `scripts/github.local.conf` (`scripts/github.conf` is the
   placeholder template). **Use the wrappers in `scripts/`, never
-  bare `gh` or `git push`.**
+  bare `gh` or `git push`.** **Never edit `scripts/github.local.conf`, by any
+  tool**: it decides what every wrapper may reach. Settings deny the Edit and
+  Write tools on it; for Bash, this line is the guard.
 - **Never print, echo, log or commit the token, and never put its name in an
   `echo` or `printf`.** `guard-token-expansion.py` enforces it. To find out
   whether it works, use it and read the 401/403.
 - **Never create issues or PRs in a burst.** Many creations in an hour get the
   account flagged as spam, and GitHub then hides everything it ever wrote. A
   batch is ONE issue with a checklist. `guard-github-burst.py` enforces it.
+  **When I say I cannot see something the API says exists, believe me** and
+  check it logged out: `sh scripts/github-public-status.sh <url>`. A 404
+  there beside a 200 from the API is the flag. Only I can appeal it.
 - Never change repository settings, secrets, Actions settings or collaborators.
   A Pages workflow publishes nothing until I set Settings → Pages → Source to
   GitHub Actions: when you add one, say so in the PR description.
