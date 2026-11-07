@@ -1,4 +1,6 @@
-// Screenshot pages of a running site, full page, at phone and desktop widths.
+// Screenshot pages of a running site, full page, at narrow-phone (360),
+// phone (390) and desktop (1280) widths. 360 is the narrowest phone in common
+// use, and where a layout that fits 390 most often starts to scroll sideways.
 //
 // USAGE:
 //   node tools/dev/shoot.js <base-url> <label> [--engine chromium|webkit] [--scheme light|dark] [--click <text>]... [--type <text>] <page>...
@@ -29,7 +31,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const WIDTHS = { phone: 390, desktop: 1280 };
+const WIDTHS = { narrow: 360, phone: 390, desktop: 1280 };
 const OUT_DIR = 'tmp/shots';
 
 function parse(argv) {
@@ -94,7 +96,7 @@ function usage(message) {
   for (const [name, width] of Object.entries(WIDTHS)) {
     const context = await browser.newContext({
       viewport: { width, height: 900 }, colorScheme: opts.scheme,
-      isMobile: name === 'phone', hasTouch: name === 'phone', deviceScaleFactor: name === 'phone' ? 2 : 1,
+      isMobile: name !== 'desktop', hasTouch: name !== 'desktop', deviceScaleFactor: name === 'desktop' ? 1 : 2,
     });
     const page = await context.newPage();
     for (const p of opts.paths) {

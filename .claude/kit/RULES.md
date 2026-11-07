@@ -38,9 +38,11 @@ project. A project's own rules, and any it sets against these, are in its
   writes `tmp/shots/` (WebKit is the engine nearest Safari), and
   `node tools/dev/slice-png.js tmp/shots/<file>.png` cuts a tall one. For one
   element up close, `node tools/dev/crop.js <base-url> <label> <selector>
-  [<page>]`; for its box and computed styles, `node tools/dev/styles.js
-  <base-url> <selector> [<page>]`. Use these rather than writing new ones in
-  `tmp/`. A page is relative to the base URL
+  [<page>] [--click <selector>]`; for its box and computed styles,
+  `node tools/dev/styles.js <base-url> <selector> [<page>]`; for the spacing
+  under it, `node tools/dev/gaps.js <base-url> <selector> [<page>]`; for
+  where the ink sits inside a crop, `python3 tools/dev/inkbox.py
+  tmp/shots/<file>.png`. Use these rather than writing new ones in `tmp/`. A page is relative to the base URL
   (`.`, `about/`), never `/about/`: a leading `/` reads as a path outside.
 - Reads outside the working directory are refused, except `/opt` and other
   agents' worktrees. Use `/dev/null` only as a redirection (`> /dev/null`,

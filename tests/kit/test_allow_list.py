@@ -66,6 +66,10 @@ REVIEWED_OPEN_RULES = {
     "Bash(node tools/dev/slice-png.js *)",
     "Bash(node tools/dev/crop.js *)",
     "Bash(node tools/dev/styles.js *)",
+    "Bash(node tools/dev/gaps.js *)",
+    # Arguments go to the script, never to python3. One .png under tmp/ and a
+    # number; reads that file, writes nothing.
+    "Bash(python3 tools/dev/inkbox.py *)",
 }
 
 

@@ -38,6 +38,8 @@
       "Bash(node tools/dev/slice-png.js *)",
       "Bash(node tools/dev/crop.js *)",
       "Bash(node tools/dev/styles.js *)",
+      "Bash(node tools/dev/gaps.js *)",
+      "Bash(python3 tools/dev/inkbox.py *)",
       "Bash(sh scripts/gh-read.sh *)",
       "Bash(sh scripts/gh-write.sh *)",
       "Bash(sh scripts/github-public-status.sh *)",
