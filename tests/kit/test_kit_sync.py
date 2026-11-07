@@ -184,6 +184,77 @@ def test_a_project_allow_that_a_new_kit_deny_covers_fails_loudly(project, kit):
     assert done.returncode == 1 and "covered by the deny rule" in done.stderr
 
 
+# --- watched: a kit or generated path the project has taken as its own ----------------
+
+OURS = '{"name": "ours", "forwardPorts": [4001]}\n'
+WATCH_DEVCONTAINER = ".devcontainer/devcontainer.json .devcontainer/devcontainer.template.json\n"
+
+
+@pytest.fixture
+def watching(bare_project: Path, kit: Path) -> Path:
+    (bare_project / ".claude" / "kit").mkdir(parents=True)
+    (bare_project / ".claude" / "kit" / "watched").write_text(
+        "# ours, reported when the kit's template changes\n" + WATCH_DEVCONTAINER)
+    (bare_project / ".devcontainer").mkdir()
+    (bare_project / ".devcontainer" / "devcontainer.json").write_text(OURS)
+    done = sync(bare_project, kit, "--adopt")
+    assert done.returncode == 0, done.stderr
+    assert "Watched files" in done.stdout and "`.devcontainer/devcontainer.json`" in done.stdout
+    return bare_project
+
+
+def test_adopt_keeps_a_watched_file_and_records_its_source(watching, kit):
+    assert (watching / ".devcontainer" / "devcontainer.json").read_text() == OURS
+    lock = json.loads((watching / ".claude" / "kit" / "kit.lock").read_text())
+    template = (kit / ".devcontainer" / "devcontainer.template.json").read_bytes()
+    assert lock["watched"] == {".devcontainer/devcontainer.json": hashlib.sha256(template).hexdigest()}
+    assert ".devcontainer/devcontainer.json" not in lock["files"]
+    assert subprocess.run(["python3", "tools/kit/build.py", "--check"], cwd=watching).returncode == 0
+    assert "Nothing to sync" in sync(watching, kit).stdout
+
+
+def test_a_change_to_a_watched_files_source_is_reported_and_never_applied(watching, kit):
+    template = kit / ".devcontainer" / "devcontainer.template.json"
+    template.write_text(template.read_text().replace("{", '{"newKey": 1, ', 1))
+    commit_all(kit)
+    done = sync(watching, kit)
+    assert done.returncode == 0, done.stderr
+    assert "Watched files" in done.stdout
+    assert ("- `.devcontainer/devcontainer.json` from `.devcontainer/devcontainer.template.json`"
+            in done.stdout)
+    assert (watching / ".devcontainer" / "devcontainer.json").read_text() == OURS
+    assert "Nothing to sync" in sync(watching, kit).stdout
+
+
+def test_a_watched_file_is_never_deleted_and_is_written_once_if_missing(watching, kit):
+    (watching / ".devcontainer" / "devcontainer.json").unlink()
+    done = sync(watching, kit)
+    assert done.returncode == 0, done.stderr
+    assert ((watching / ".devcontainer" / "devcontainer.json").read_bytes()
+            == (kit / ".devcontainer" / "devcontainer.template.json").read_bytes())
+
+
+def test_taking_over_a_kit_file_later_does_not_count_as_editing_it(project, kit):
+    guard = project / ".claude" / "hooks" / "guard-awk.py"
+    guard.write_text(guard.read_text() + "# ours now\n")
+    (project / ".claude" / "kit" / "watched").write_text(".claude/hooks/guard-awk.py\n")
+    done = sync(project, kit)
+    assert done.returncode == 0, done.stderr
+    assert guard.read_text().endswith("# ours now\n")
+    lock = json.loads((project / ".claude" / "kit" / "kit.lock").read_text())
+    assert ".claude/hooks/guard-awk.py" in lock["watched"] and ".claude/hooks/guard-awk.py" not in lock["files"]
+
+
+@pytest.mark.parametrize("line", [".devcontainer/devcontainer.json no/such/source\n",
+                                  "/etc/passwd\n", "a b c\n", "../x\n"])
+def test_a_bad_watched_line_is_refused(project, kit, line):
+    (project / ".claude" / "kit" / "watched").write_text(line)
+    before = snapshot(project)
+    done = sync(project, kit)
+    assert done.returncode == 1 and "watched" in done.stderr
+    assert snapshot(project) == before
+
+
 def test_status_prints_the_kit_commit(project, kit):
     done = subprocess.run(["python3", "tools/kit/sync.py", "--status"], cwd=project,
                           capture_output=True, text=True)

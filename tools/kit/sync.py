@@ -22,6 +22,13 @@ With --adopt there is no lock to check, so files that differ from the kit are
 replaced and listed. Compare them first (--adopt --dry-run): a project's better
 version goes to the kit before the sync, not after.
 
+A project may take a kit or generated path as its own by listing it in
+.claude/kit/watched, one `<path> [<kit source>]` per line (the source defaults
+to the path itself). The sync then writes a watched path only when it is
+missing, never deletes it, and build.py never generates it. kit.lock records
+the source's sha256 under "watched", and the report names every watched path
+whose kit source changed since the last sync, for a person to compare.
+
 Standard library and git only. Reads the kit clone; writes only inside this
 project, and nothing at all with --dry-run or --status.
 """
@@ -35,6 +42,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 LOCK = Path(".claude/kit/kit.lock")
+WATCHED = Path(".claude/kit/watched")
 REPORT = Path("tmp/kit-sync-report.md")
 DEFAULT_KIT = Path("tmp/kit")
 MANIFEST = Path("kit/manifest")
@@ -72,6 +80,25 @@ def read_manifest(text: str) -> list[tuple[str, str, str | None]]:
                 raise SyncError(f"kit/manifest line {number}: {word!r} must be a relative path inside the repo")
         entries.append((kind, words[1], words[2] if len(words) == 3 else None))
     return entries
+
+
+def read_watched(root: Path) -> dict[str, str]:
+    """The project's .claude/kit/watched: {path: kit source path}."""
+    path = root / WATCHED
+    if not path.is_file():
+        return {}
+    watched = {}
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        words = line.split("#", 1)[0].split()
+        if not words:
+            continue
+        if len(words) > 2:
+            raise SyncError(f"{WATCHED} line {number} is not `<path> [<kit source>]`: {line!r}")
+        for word in words:
+            if word.startswith("/") or ".." in Path(word).parts:
+                raise SyncError(f"{WATCHED} line {number}: {word!r} must be a relative path inside the repo")
+        watched[words[0]] = words[-1]
+    return watched
 
 
 def tracked(kit: Path) -> list[str]:
@@ -143,10 +170,14 @@ class Plan:
     removed: list[str] = field(default_factory=list)
     created: dict[str, bytes] = field(default_factory=dict)      # project files to write
     new_env_keys: list[str] = field(default_factory=list)
+    watched: dict[str, str] = field(default_factory=dict)        # path -> its kit source's sha256
+    watched_changed: list[str] = field(default_factory=list)     # source differs from the lock's
+    watched_source: dict[str, str] = field(default_factory=dict) # path -> its kit source path
 
     def empty(self) -> bool:
         return (self.old_commit == self.new_commit and not self.added and not self.changed
-                and not self.replaced and not self.removed and not self.created)
+                and not self.replaced and not self.removed and not self.created
+                and not self.watched_changed)
 
     def devcontainer_changed(self) -> bool:
         touched = self.added + self.changed + self.replaced + self.removed + list(self.created)
@@ -167,7 +198,14 @@ def plan(root: Path, kit: Path, adopt: bool) -> Plan:
                         "clone it with sh scripts/git-clone-agent.sh helen-contains-claude-webdev tmp/kit")
     if git(kit, "status", "--porcelain").strip():
         raise SyncError(f"{kit} has uncommitted changes; sync only from a clean clone")
-    owned = expand(read_manifest((kit / MANIFEST).read_text(encoding="utf-8")), tracked(kit))
+    kit_files = tracked(kit)
+    owned = expand(read_manifest((kit / MANIFEST).read_text(encoding="utf-8")), kit_files)
+    watched = read_watched(root)
+    for path, source in watched.items():
+        if source not in kit_files:
+            raise SyncError(f"{WATCHED} watches {path} against {source}, which the kit doesn't track")
+        for kind in ("kit", "project", "generated"):
+            owned[kind].pop(path, None)
     lock = load_lock(root)
     if lock is None and not adopt:
         raise SyncError(f"no {LOCK}: this project has never been synced. Compare it with the kit "
@@ -179,7 +217,7 @@ def plan(root: Path, kit: Path, adopt: bool) -> Plan:
                   new_commit=git(kit, "rev-parse", "HEAD").strip())
     locked = lock["files"] if lock else {}
 
-    edited = edited_kit_files(root, lock) if lock else []
+    edited = [p for p in edited_kit_files(root, lock) if p not in watched] if lock else []
     if edited:
         raise SyncError(
             "these kit-owned files were changed in this project, so a sync would lose the change:\n"
@@ -206,10 +244,21 @@ def plan(root: Path, kit: Path, adopt: bool) -> Plan:
             + "".join(f"  {p}\n" for p in collisions)
             + "Rename the project's file, or make it identical to the kit's, then sync.")
 
-    result.removed = sorted(p for p in locked if p not in result.files and (root / p).is_file())
+    result.removed = sorted(p for p in locked if p not in result.files and p not in watched
+                            and (root / p).is_file())
     for path, template in sorted(owned["project"].items()):
         if not (root / path).exists():
             result.created[path] = (kit / (template or path)).read_bytes()
+
+    recorded = lock.get("watched", {}) if lock else {}
+    for path, source in sorted(watched.items()):
+        content = (kit / source).read_bytes()
+        result.watched[path] = sha256(content)
+        result.watched_source[path] = source
+        if recorded.get(path) != result.watched[path]:
+            result.watched_changed.append(path)
+        if not (root / path).exists():
+            result.created[path] = content
 
     template_env = kit / ".devcontainer" / "kit.env"
     project_env = root / ".devcontainer" / "kit.env"
@@ -233,6 +282,8 @@ def apply(root: Path, p: Plan) -> list[str]:
         target.write_bytes(content)
     lock = {"kit_repo": p.kit_repo, "kit_commit": p.new_commit,
             "files": {path: sha256(content) for path, content in sorted(p.files.items())}}
+    if p.watched:
+        lock["watched"] = dict(sorted(p.watched.items()))
     (root / LOCK).parent.mkdir(parents=True, exist_ok=True)
     (root / LOCK).write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
     done = subprocess.run([sys.executable, "tools/kit/build.py"], cwd=root, capture_output=True, text=True)
@@ -262,6 +313,9 @@ def report(p: Plan, rebuilt: list[str] | None, dry_run: bool) -> str:
     section("Replaced (this project's copy differed from the kit's)", p.replaced)
     section("Removed (the kit no longer ships them)", p.removed)
     section("Project files created from the kit's templates: fill them in", list(p.created))
+    section("Watched files whose kit source changed since the last sync: they are this "
+            "project's, so compare each with its source by hand",
+            [f"{path}` from `{p.watched_source[path]}" for path in p.watched_changed])
     if rebuilt is not None:
         section("Generated files rebuilt", rebuilt)
     if p.new_env_keys:

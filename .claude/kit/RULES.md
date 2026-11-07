@@ -72,6 +72,10 @@ project. A project's own rules, and any it sets against these, are in its
 - **`.claude/settings.json` and `.devcontainer/devcontainer.json` are
   generated.** Edit `.claude/settings.project.json` or
   `.devcontainer/kit.env`, then run `python3 tools/kit/build.py`.
+- **A path in `.claude/kit/watched` is the project's own** (`<path> [<kit
+  source>]` per line): the sync never overwrites or deletes it, the builder
+  never generates it, and the sync report names it when its kit source
+  changes. Compare those by hand; the kit never applies them.
 - **A project allow rule never undoes a kit deny.** The builder refuses one.
 
 ## Critical restrictions
