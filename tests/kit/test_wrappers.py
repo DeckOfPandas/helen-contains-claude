@@ -307,6 +307,21 @@ def test_check_link_refusals(project, url):
     assert refused(run(project, "check-link.sh", url))
 
 
+@pytest.mark.parametrize("url", ["http://localhost:4001/", "http://localhost:4001/mysite/about/"])
+def test_check_link_reaches_a_local_server_over_plain_http(project, url):
+    out = ok(run(project, "check-link.sh", url))
+    assert out[-1] == url
+    assert "--proto" in out and out[out.index("--proto") + 1] == "=http"
+    assert "--location" not in out and "--user-agent" not in out
+
+
+@pytest.mark.parametrize("url", ["http://localhost/", "http://localhost:4001",
+                                 "http://localhost:40a1/", "http://localhost:4001@evil.org/",
+                                 "http://localhost.evil.org:4001/", "http://127.0.0.1:4001/"])
+def test_check_link_refuses_any_other_plain_http(project, url):
+    assert refused(run(project, "check-link.sh", url))
+
+
 def test_check_link_takes_one_url(project):
     assert refused(run(project, "check-link.sh", "https://a.org", "https://b.org"))
     assert refused(run(project, "check-link.sh"))
