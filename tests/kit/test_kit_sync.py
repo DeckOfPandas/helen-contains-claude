@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+pytestmark = pytest.mark.skipif(not (ROOT / "kit" / "manifest").is_file(),
+                                reason="this is a project: the sync is tested in the kit, from its tracked files")
 GIT_ID = ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"]
 
 
