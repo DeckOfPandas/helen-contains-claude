@@ -101,11 +101,22 @@ load_conf() {
     in_list "$repo" $GH_REPOS || refuse "$conf_name:PR_ONLY_REPOS names '$repo', which is not in GH_REPOS"
     ! in_list "$repo" $MAIN_PUSH_REPOS || refuse "$conf_name:'$repo' is in both PR_ONLY_REPOS and MAIN_PUSH_REPOS"
   done
-  for dir in $NESTED_DIRS; do
+  # An entry is `folder` or `folder:repo`; the repo is only for
+  # session-ground-truth.py's clone hint. NESTED_DIRS leaves holding folders only.
+  folders=""
+  for entry in $NESTED_DIRS; do
+    dir="${entry%%:*}"
     case "$dir" in
       -* | .* | *[!A-Za-z0-9._-]*) refuse "$conf_name:NESTED_DIRS '$dir' is not one folder name in this checkout" ;;
     esac
+    case "$entry" in
+      *:*)
+        # shellcheck disable=SC2086
+        in_list "${entry#*:}" $GH_REPOS || refuse "$conf_name:NESTED_DIRS '$entry' names a repo not in GH_REPOS" ;;
+    esac
+    folders="${folders:+$folders }$dir"
   done
+  NESTED_DIRS="$folders"
   # shellcheck disable=SC2086
   set -- $GH_REPOS
   DEFAULT_REPO="$1"

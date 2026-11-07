@@ -64,9 +64,17 @@ def test_refused_with_no_nested_dirs(project):
     assert refused(run(project, "git-nested.sh", "_drafts", "status"))
 
 
-@pytest.mark.parametrize("value", ['"../x"', '".git"', '"-x"', '"a/b"'])
+@pytest.mark.parametrize("value", ['"../x"', '".git"', '"-x"', '"a/b"',
+                                   '"_x:nope"', '"../x:site"', '":site"'])
 def test_bad_nested_dirs_are_refused(project, value):
     assert refused(run(project, "git-nested.sh", "x", "status", conf=CONF + f"NESTED_DIRS={value}\n"))
+
+
+def test_a_folder_may_name_the_repo_it_clones(project):
+    conf = CONF + 'NESTED_DIRS="_drafts:drafts _other"\n'
+    out = ok(run(project, "git-nested.sh", "_drafts", "status", conf=conf))
+    assert out == ["git", *SAFE, "status"]
+    assert refused(run(project, "git-nested.sh", "_drafts:drafts", "status", conf=conf))
 
 
 # --- for real, against a nested repo ------------------------------------------------

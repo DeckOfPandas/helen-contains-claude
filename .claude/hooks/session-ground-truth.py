@@ -4,8 +4,10 @@
 A bind-mounted checkout can change branch under a running session with no
 signal, so the facts go in the first thing a session reads: the checkout's
 path, whether this is the container or the bare host, the branch, uncommitted
-changes, the position against `origin/main` as last fetched, and how far the
-project's kit commit (.claude/kit/kit.lock) is behind the kit clone in tmp/kit.
+changes, the position against `origin/main` as last fetched, how far the
+project's kit commit (.claude/kit/kit.lock) is behind the kit clone in tmp/kit,
+and which `folder:repo` nested clones in the GitHub config are absent: a test
+suite that reads one collects nothing from it, and reports green.
 
 It never waits on the network: a hook that waits on GitHub delays every start.
 The one network call, a fetch of tmp/kit, runs detached and serves the next
@@ -137,6 +139,41 @@ def _kit_line(root: Path) -> str:
     return f"kit: {behind} commits behind (synced at {commit[:12]}; as last fetched) -- /kit-sync"
 
 
+def _github_conf(root: Path) -> dict[str, str]:
+    """KEY=value from the GitHub config, found as scripts/_github_conf.sh finds
+    it: this checkout's github.local.conf, the main checkout's, then the
+    committed github.conf. Values are not validated; the wrappers do that."""
+    common = _git_in(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    candidates = [root / "scripts" / "github.local.conf"]
+    if common:
+        candidates.append(Path(common).parent / "scripts" / "github.local.conf")
+    candidates.append(root / "scripts" / "github.conf")
+    for path in candidates:
+        if path.is_file():
+            values = {}
+            for line in path.read_text(encoding="utf-8").splitlines():
+                key, sep, value = line.split("#", 1)[0].partition("=")
+                if sep:
+                    values[key.strip()] = value.strip().strip("\"'")
+            return values
+    return {}
+
+
+def _nested_lines(root: Path) -> list[str]:
+    """One line per absent `folder:repo` clone; nothing when all are present."""
+    missing = []
+    for entry in _github_conf(root).get("NESTED_DIRS", "").split():
+        folder, sep, repo = entry.partition(":")
+        if sep and repo and not (root / folder / ".git").exists():
+            missing.append((folder, repo))
+    if not missing:
+        return []
+    return ["nested: " + ", ".join(f for f, _ in missing) + " ABSENT. A test run here is NOT "
+            "evidence about them: their checks are never collected, so the count falls and "
+            "nothing reports missing. Cloning is reading:"] + [
+        f"    sh scripts/git-clone-agent.sh {repo} {folder}" for folder, repo in missing]
+
+
 def main() -> int:
     try:
         raw = sys.stdin.read()
@@ -146,7 +183,7 @@ def main() -> int:
             payload = {}
         root = resolve_root(payload if isinstance(payload, dict) else {})
         lines = [_sandbox_line(), _branch_line(root), _dirty_line(root), _position_line(root),
-                 _kit_line(root)]
+                 _kit_line(root), *_nested_lines(root)]
         report = f"Where this session actually is -- {root}:\n" + "\n".join(
             f"  {line}" for line in lines
         )
