@@ -11,7 +11,8 @@
 #   sh scripts/gh-write.sh issue-label  <repo> <number> <label>
 #   sh scripts/gh-write.sh label-create <repo> <label> <rrggbb>
 #
-# <repo> is a bare name from GH_REPOS in the GitHub config. A PR's base is
+# <repo> is a bare name from GH_REPOS in the GitHub config; a repo in
+# PR_ONLY_REPOS takes pr-create and pr-body only. A PR's base is
 # always main and its head never is. `comment` and `issue-label` take an
 # issue or PR number. A label is letters, digits, dots, dashes and underscores;
 # a colour is six hex digits with no #. `issue-label` adds one label that
@@ -95,7 +96,7 @@ case "$action" in
     ;;
   comment)
     [ "$#" -eq 3 ] || refuse "$usage"
-    check_repo "$1"
+    check_issue_repo "$1"
     check_number "$2"
     check_body "$3"
     set -- sh "$here/gh-agent.sh" api --method POST "repos/$GH_OWNER/$1/issues/$2/comments" \
@@ -104,7 +105,7 @@ case "$action" in
     ;;
   issue-create)
     [ "$#" -eq 3 ] || [ "$#" -eq 4 ] || refuse "$usage"
-    check_repo "$1"
+    check_issue_repo "$1"
     [ -n "$2" ] || refuse "an issue needs a title"
     check_body "$3"
     if [ "$#" -eq 4 ]; then
@@ -120,7 +121,7 @@ case "$action" in
     ;;
   issue-label)
     [ "$#" -eq 3 ] || refuse "$usage"
-    check_repo "$1"
+    check_issue_repo "$1"
     check_number "$2"
     check_label "$3"
     set -- sh "$here/gh-agent.sh" api --method POST "repos/$GH_OWNER/$1/issues/$2/labels" \
@@ -129,7 +130,7 @@ case "$action" in
     ;;
   label-create)
     [ "$#" -eq 3 ] || refuse "$usage"
-    check_repo "$1"
+    check_issue_repo "$1"
     check_label "$2"
     check_colour "$3"
     set -- sh "$here/gh-agent.sh" api --method POST "repos/$GH_OWNER/$1/labels" \

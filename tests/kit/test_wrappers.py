@@ -204,6 +204,41 @@ def test_issue_and_label_refusals(project, args):
     assert refused(run(project, "gh-write.sh", *args))
 
 
+# --- PR-only repos ----------------------------------------------------------------
+
+PR_ONLY_CONF = CONF + "PR_ONLY_REPOS=kit\n"
+PR_ONLY_CONF = PR_ONLY_CONF.replace('GH_REPOS="site drafts"', 'GH_REPOS="site drafts kit"')
+
+
+@pytest.mark.parametrize("args", [
+    ["comment", "kit", "1", "tmp/body.md"],
+    ["issue-create", "kit", "T", "tmp/body.md"],
+    ["issue-label", "kit", "1", "parked"],
+    ["label-create", "kit", "parked", "9a9a9a"],
+])
+def test_a_pr_only_repo_refuses_every_write_but_a_pr(project, args):
+    result = run(project, "gh-write.sh", *args, conf=PR_ONLY_CONF)
+    assert refused(result) and "PR_ONLY_REPOS" in result.stderr
+
+
+def test_a_pr_only_repo_takes_a_pr_and_its_body(project):
+    out = ok(run(project, "gh-write.sh", "pr-create", "kit", "feat/x", "T", "tmp/body.md",
+                  conf=PR_ONLY_CONF))
+    assert "repos/acme/kit/pulls" in out
+    out = ok(run(project, "gh-write.sh", "pr-body", "kit", "4", "tmp/body.md"))
+    assert "repos/acme/kit/pulls/4" in out
+
+
+def test_a_pr_only_repos_main_is_never_pushed(project):
+    assert refused(run(project, "git-push-agent.sh", "feat:main", "kit", "sub", conf=PR_ONLY_CONF))
+    assert ok(run(project, "git-push-agent.sh", "feat:feat", "kit", "sub"))
+
+
+def test_other_repos_keep_their_writes_beside_a_pr_only_one(project):
+    out = ok(run(project, "gh-write.sh", "comment", "site", "1", "tmp/body.md", conf=PR_ONLY_CONF))
+    assert "repos/acme/site/issues/1/comments" in out
+
+
 # --- public status --------------------------------------------------------------
 
 @pytest.mark.parametrize("url", ["https://github.com/acme/site/pull/1", "https://github.com/acme-bot"])
@@ -249,6 +284,8 @@ def test_check_link_takes_one_url(project):
     "GH_OWNER=acme\nGH_REPOS=\"a b;rm\"\nGH_AGENT_USER=b\n",
     "GH_OWNER=$(id)\nGH_REPOS=a\nGH_AGENT_USER=b\n",
     "GH_OWNER=acme\nGH_REPOS=\nGH_AGENT_USER=b\n",
+    "GH_OWNER=acme\nGH_REPOS=a\nGH_AGENT_USER=b\nPR_ONLY_REPOS=z\n",
+    "GH_OWNER=acme\nGH_REPOS=a\nGH_AGENT_USER=b\nMAIN_PUSH_REPOS=a\nPR_ONLY_REPOS=a\n",
 ])
 def test_bad_config_is_refused(project, conf):
     assert refused(run(project, "git-fetch-main.sh", conf=conf))
