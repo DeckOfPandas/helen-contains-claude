@@ -50,14 +50,29 @@ def test_build_args_exist_in_the_dockerfile_with_kit_env_defaults(kit_root):
     block = re.search(r"BUILD_ARGS=\(\n(.*?)\n\)", run_sh, re.DOTALL).group(1)
     for name in re.findall(r'"(\w+)=', block) + ["CLAUDE_CODE_VERSION"]:
         assert name in args, f"run.sh passes {name}, which the Dockerfile never declares"
-    # A project turns toggles on in kit.env, so only the versions must agree; a
-    # bare `docker build` gets every toggle off.
-    env = kit_env(kit_root)
+    # A project sets its own versions and toggles in kit.env, so the Dockerfile's
+    # defaults agree with run.sh's; a bare `docker build` gets every toggle off.
+    defaults = run_sh_defaults(run_sh)
     for name in ("NODE_MAJOR", "PLAYWRIGHT_VERSION"):
-        assert args[name].strip('"') == env[name], f"Dockerfile default for {name} differs from kit.env"
+        assert args[name].strip('"') == defaults[name], f"Dockerfile default for {name} differs from run.sh's"
     for name in KIT_DEFAULTS:
         if name.startswith("WITH_"):
             assert args[name].strip('"') == "0", f"Dockerfile default for {name} is not off"
+
+
+def run_sh_defaults(run_sh: str) -> dict[str, str]:
+    block = re.search(r"^PROJECT_NAME=\"\"\n(.*?)\n\n", run_sh, re.DOTALL | re.MULTILINE).group(1)
+    return {k: v.strip("\"'") for k, v in re.findall(r"^(\w+)=(.*)$", block, re.MULTILINE)}
+
+
+def test_the_kits_kit_env_ships_run_sh_defaults(kit_root):
+    if not (kit_root / "kit" / "manifest").is_file():
+        pytest.skip("a project's kit.env holds its own values; the kit checks its template")
+    defaults = run_sh_defaults((kit_root / ".devcontainer" / "run.sh").read_text())
+    env = kit_env(kit_root)
+    assert defaults, "read no defaults from run.sh -- has its layout changed?"
+    for name, value in defaults.items():
+        assert env[name] == value, f"the kit's kit.env ships {name}={env[name]}, run.sh defaults to {value}"
 
 
 def test_python_packages_are_pinned(kit_root):
@@ -125,8 +140,17 @@ def test_host_dotfiles_that_reload_bashrc_do_not_loop(tmp_path, kit_root):
     assert (tmp_path / "passes").read_text().count("pass") == 6
 
 
+def copy_build_inputs(kit_root: Path, dest: Path) -> None:
+    """What set-project-name.py and tools/kit/build.py need to run in `dest`."""
+    shutil.copytree(kit_root / ".devcontainer", dest / ".devcontainer")
+    shutil.copytree(kit_root / "tools" / "kit", dest / "tools" / "kit")
+    (dest / ".claude" / "kit").mkdir(parents=True)
+    shutil.copy(kit_root / ".claude" / "kit" / "settings.kit.json", dest / ".claude" / "kit")
+    shutil.copy(kit_root / ".claude" / "settings.project.json", dest / ".claude")
+
+
 def test_set_project_name(tmp_path, kit_root):
-    shutil.copytree(kit_root / ".devcontainer", tmp_path / ".devcontainer")
+    copy_build_inputs(kit_root, tmp_path)
     done = subprocess.run(["python3", ".devcontainer/set-project-name.py", "my-site"],
                           cwd=tmp_path, capture_output=True, text=True)
     assert done.returncode == 0, done.stderr
@@ -156,7 +180,7 @@ KIT_DEFAULTS = {
 
 @pytest.fixture
 def project(tmp_path: Path, kit_root: Path) -> Path:
-    shutil.copytree(kit_root / ".devcontainer", tmp_path / ".devcontainer")
+    copy_build_inputs(kit_root, tmp_path)
     (tmp_path / ".devcontainer" / "kit.local.env").unlink(missing_ok=True)
     kit = tmp_path / ".devcontainer" / "kit.env"
     text = kit.read_text()

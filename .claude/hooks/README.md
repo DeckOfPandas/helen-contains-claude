@@ -2,11 +2,12 @@
 
 Each hook is one Python file with no imports beyond the standard library. Each is
 run as `python3 <path>`, so none needs an execute bit. All are wired in
+`.claude/kit/settings.kit.json`, from which `tools/kit/build.py` writes
 `.claude/settings.json`.
 
 | Hook | Event | Does |
 |---|---|---|
-| `session-ground-truth.py` | SessionStart | Reports the checkout, container or host, branch, dirty tree, and position against `origin/main` |
+| `session-ground-truth.py` | SessionStart | Reports the checkout, container or host, branch, dirty tree, position against `origin/main`, and how far `.claude/kit/kit.lock` is behind the kit clone in `tmp/kit` (fetching that clone in the background for the next session) |
 | `guard-main-branch.py` | PreToolUse Bash | Refuses `git commit` / `git merge` on `main` or `master` |
 | `guard-destructive-git.py` | PreToolUse Bash | Refuses `reset --hard`, `checkout --`, `clean -f`, `restore` on a dirty tree; `stash drop/clear` while stashes exist |
 | `guard-token-expansion.py` | PreToolUse Bash | Refuses commands that would print a secret, embed one in a URL, or dump the environment |
@@ -27,3 +28,9 @@ rule; `scripts/git-diff-main-checkout.sh` is the model.
 
 `tests/kit/test_hooks.py` and `tests/kit/test_text_tool_guards.py` cover what
 each refuses and lets through, and that each is wired in.
+
+One more hook lives in the image, not here: `.devcontainer/session-place.py`,
+wired in `/etc/claude-code/managed-settings.json`. A project's hooks don't run
+in a session started inside a nested clone, so it warns there, in every
+session in the container, and nothing inside can switch it off.
+`tests/kit/test_session_place.py` covers it.

@@ -1,0 +1,8 @@
+{
+  "_about": "This project's additions to the kit's .claude/kit/settings.kit.json. python3 tools/kit/build.py merges the two into .claude/settings.json: lists are joined, a kit value cannot be changed, and an allow rule that a deny rule covers is refused. Keys starting with _ never reach settings.json. _reviewedOpenRules maps each allow rule here ending in ' *' to the options of its tool you checked for running a program or writing a file anywhere.",
+  "_reviewedOpenRules": {},
+  "permissions": {
+    "allow": [],
+    "deny": []
+  }
+}

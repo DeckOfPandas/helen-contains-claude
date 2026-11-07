@@ -1,0 +1,51 @@
+# Who owns each path the kit ships. tools/kit/sync.py reads this from a clone
+# of the kit; tests/kit/test_kit_manifest.py fails on a tracked file it doesn't
+# name, and on a path named twice.
+#
+#   kit <path>                    copied whole on every sync, never edited in a project
+#   project <path> [<template>]   written from <template> (default: <path> itself)
+#                                 when the project lacks it, then never touched by a sync
+#   generated <path>              written by tools/kit/build.py, never edited by hand
+#   kit-repo <path>               this repo's own, never shipped
+#
+# A path ending in / means every tracked file under it.
+
+kit .claude/hooks/
+kit .claude/kit/RULES.md
+kit .claude/kit/settings.kit.json
+kit .claude/memory-seed/
+kit .claude/settings.local.example.json
+kit .claude/skills/kit-sync/
+kit .devcontainer/.dockerignore
+kit .devcontainer/Dockerfile
+kit .devcontainer/build_inputs_hash.py
+kit .devcontainer/claude_code_latest.py
+kit .devcontainer/container.bashrc
+kit .devcontainer/devcontainer.template.json
+kit .devcontainer/init-firewall.sh
+kit .devcontainer/kit.local.example.env
+kit .devcontainer/managed-settings.json
+kit .devcontainer/read_local_token.py
+kit .devcontainer/run.sh
+kit .devcontainer/seed_memory.py
+kit .devcontainer/session-place.py
+kit .devcontainer/set-project-name.py
+kit scripts/
+kit tests/kit/
+kit tools/dev/
+kit tools/kit/
+
+project CLAUDE.md kit/templates/CLAUDE.md
+project .claude/settings.project.json
+project .devcontainer/kit.env
+project .devcontainer/project.bashrc
+project .devcontainer/requirements.txt
+project .gitignore
+project pytest.ini
+
+generated .claude/settings.json
+generated .devcontainer/devcontainer.json
+
+kit-repo README.md
+kit-repo docs/
+kit-repo kit/

@@ -1,12 +1,26 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 KIT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def load_tool(name: str):
+    """tools/kit/<name>.py as a module. Registered in sys.modules before it
+    runs, because dataclasses look their module up there."""
+    if f"kit_{name}" in sys.modules:
+        return sys.modules[f"kit_{name}"]
+    spec = importlib.util.spec_from_file_location(f"kit_{name}", KIT_ROOT / "tools" / "kit" / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 @pytest.fixture
