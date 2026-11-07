@@ -1,6 +1,6 @@
-"""No kit-owned or generated file is ever part of a project's Jekyll site, so a
-sync can break tooling but never the live site. Excluded in _config.yml, and
-absent from the built site when there is one."""
+"""No kit-owned, generated or watched file is ever part of a project's Jekyll
+site, so a sync can break tooling but never the live site. Excluded in
+_config.yml, and absent from the built site when there is one."""
 from __future__ import annotations
 
 import fnmatch
@@ -73,7 +73,8 @@ def kit_paths() -> list[str]:
     lock = ROOT / ".claude" / "kit" / "kit.lock"
     if not lock.is_file():
         return []
-    return sorted(json.loads(lock.read_text(encoding="utf-8"))["files"]) + GENERATED
+    data = json.loads(lock.read_text(encoding="utf-8"))
+    return sorted(set(data["files"]) | set(data.get("watched", {})) | set(GENERATED))
 
 
 def _site_relative(config: dict) -> tuple[Path, list[str]]:

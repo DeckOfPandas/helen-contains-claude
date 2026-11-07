@@ -18,6 +18,9 @@ Merge rules, so the project can add to the kit but never take away from it:
   reaches settings.json;
 - every object's keys are sorted, so the same inputs write the same bytes.
 
+A path listed in .claude/kit/watched is the project's own: it is neither
+written nor checked here.
+
 Standard library only. Writes only the two generated files.
 """
 from __future__ import annotations
@@ -33,6 +36,7 @@ SETTINGS = Path(".claude/settings.json")
 KIT_ENV = Path(".devcontainer/kit.env")
 DEVCONTAINER_TEMPLATE = Path(".devcontainer/devcontainer.template.json")
 DEVCONTAINER = Path(".devcontainer/devcontainer.json")
+WATCHED = Path(".claude/kit/watched")
 VALID_NAME = re.compile(r"[a-z0-9][a-z0-9_.-]*")
 RULE = re.compile(r"^(?P<tool>[A-Za-z_]+)(?:\((?P<spec>.*)\))?$")
 
@@ -151,14 +155,27 @@ def _load_json(path: Path) -> dict:
         raise BuildError(f"{path} is not valid JSON: {e}") from None
 
 
+def watched(root: Path) -> set[Path]:
+    """The first word of each line of .claude/kit/watched; sync.py checks the rest."""
+    path = root / WATCHED
+    if not path.is_file():
+        return set()
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return {Path(words[0]) for line in lines if (words := line.split("#", 1)[0].split())}
+
+
 def outputs(root: Path) -> dict[Path, str]:
-    project_settings = root / PROJECT_SETTINGS
-    project = _load_json(project_settings) if project_settings.is_file() else {}
-    return {
-        SETTINGS: build_settings(_load_json(root / KIT_SETTINGS), project),
-        DEVCONTAINER: build_devcontainer((root / DEVCONTAINER_TEMPLATE).read_text(encoding="utf-8"),
-                                         (root / KIT_ENV).read_text(encoding="utf-8")),
-    }
+    skip = watched(root)
+    built = {}
+    if SETTINGS not in skip:
+        project_settings = root / PROJECT_SETTINGS
+        project = _load_json(project_settings) if project_settings.is_file() else {}
+        built[SETTINGS] = build_settings(_load_json(root / KIT_SETTINGS), project)
+    if DEVCONTAINER not in skip:
+        built[DEVCONTAINER] = build_devcontainer(
+            (root / DEVCONTAINER_TEMPLATE).read_text(encoding="utf-8"),
+            (root / KIT_ENV).read_text(encoding="utf-8"))
+    return built
 
 
 def main(argv: list[str]) -> int:

@@ -50,6 +50,7 @@ load_conf() {
   GH_REPOS=""
   GH_AGENT_USER=""
   MAIN_PUSH_REPOS=""
+  PR_ONLY_REPOS=""
   NESTED_DIRS=""
   conf="$(conf_path)"
   conf_name="${conf##*/}"
@@ -71,6 +72,7 @@ load_conf() {
       GH_REPOS) GH_REPOS="$value" ;;
       GH_AGENT_USER) GH_AGENT_USER="$value" ;;
       MAIN_PUSH_REPOS) MAIN_PUSH_REPOS="$value" ;;
+      PR_ONLY_REPOS) PR_ONLY_REPOS="$value" ;;
       NESTED_DIRS) NESTED_DIRS="$value" ;;
       *) refuse "$conf_name:unknown key '$key'" ;;
     esac
@@ -93,11 +95,28 @@ load_conf() {
   for repo in $MAIN_PUSH_REPOS; do
     in_list "$repo" $GH_REPOS || refuse "$conf_name:MAIN_PUSH_REPOS names '$repo', which is not in GH_REPOS"
   done
-  for dir in $NESTED_DIRS; do
+  # A PR-only repo's main moves only by a merged PR, so it is never a main-push repo.
+  # shellcheck disable=SC2086
+  for repo in $PR_ONLY_REPOS; do
+    in_list "$repo" $GH_REPOS || refuse "$conf_name:PR_ONLY_REPOS names '$repo', which is not in GH_REPOS"
+    ! in_list "$repo" $MAIN_PUSH_REPOS || refuse "$conf_name:'$repo' is in both PR_ONLY_REPOS and MAIN_PUSH_REPOS"
+  done
+  # An entry is `folder` or `folder:repo`; the repo is only for
+  # session-ground-truth.py's clone hint. NESTED_DIRS leaves holding folders only.
+  folders=""
+  for entry in $NESTED_DIRS; do
+    dir="${entry%%:*}"
     case "$dir" in
       -* | .* | *[!A-Za-z0-9._-]*) refuse "$conf_name:NESTED_DIRS '$dir' is not one folder name in this checkout" ;;
     esac
+    case "$entry" in
+      *:*)
+        # shellcheck disable=SC2086
+        in_list "${entry#*:}" $GH_REPOS || refuse "$conf_name:NESTED_DIRS '$entry' names a repo not in GH_REPOS" ;;
+    esac
+    folders="${folders:+$folders }$dir"
   done
+  NESTED_DIRS="$folders"
   # shellcheck disable=SC2086
   set -- $GH_REPOS
   DEFAULT_REPO="$1"
@@ -106,6 +125,13 @@ load_conf() {
 check_repo() {
   # shellcheck disable=SC2086
   in_list "$1" $GH_REPOS || refuse "'$1' is not one of the repos in $conf_name ($GH_REPOS)"
+}
+
+# For a write other than opening or editing a PR: comment, issue, label.
+check_issue_repo() {
+  check_repo "$1"
+  # shellcheck disable=SC2086
+  ! in_list "$1" $PR_ONLY_REPOS || refuse "'$1' is in PR_ONLY_REPOS in $conf_name: open and edit PRs there, nothing else"
 }
 
 # A path relative to this checkout: no absolute path, no `..`, no option.

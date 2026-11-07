@@ -2,25 +2,28 @@
 // print its box in CSS px from the page's top-left.
 //
 // USAGE:
-//   node tools/dev/crop.js <base-url> <label> <selector> [<page>] [--width <px>] [--engine chromium|webkit] [--type-into <selector> <text>]
+//   node tools/dev/crop.js <base-url> <label> <selector> [<page>] [--width <px>] [--engine chromium|webkit] [--click <selector>] [--type-into <selector> <text>]
 //
 //   node tools/dev/crop.js http://127.0.0.1:9000 header .site-header
 //   node tools/dev/crop.js http://127.0.0.1:9000 menu nav about/ --width 390
+//   node tools/dev/crop.js http://127.0.0.1:9000 open-menu .menu-panel . --click .menu-button
 //   node tools/dev/crop.js http://127.0.0.1:9000 dropdown .search-results . --type-into .search-input ch
 //
 // The shot lands in tmp/shots/crop-<label>.png. <page> is relative to the
 // base URL (`.` by default) and may not start with `/`: the permission checker
-// reads that as an absolute path and asks. --type-into types <text> into the
-// first match for its selector before the shot, for something that only shows
-// once somebody has typed, such as a search dropdown. A dropdown usually hangs
-// outside its box, so crop the dropdown's own selector.
+// reads that as an absolute path and asks. --click clicks the first match for
+// its selector before the shot, for a control that reveals or changes
+// something. --type-into then types <text> into the first match for its
+// selector, for something that only shows once somebody has typed, such as a
+// search dropdown. A dropdown usually hangs outside its box, so crop the
+// dropdown's own selector.
 //
 // Needs WITH_PLAYWRIGHT=1 in kit.env (see tools/dev/shoot.js).
 const fs = require('fs');
 const path = require('path');
 
 const OUT_DIR = 'tmp/shots';
-const USAGE = 'usage: node tools/dev/crop.js <base-url> <label> <selector> [<page>] [--width <px>] [--engine chromium|webkit] [--type-into <selector> <text>]';
+const USAGE = 'usage: node tools/dev/crop.js <base-url> <label> <selector> [<page>] [--width <px>] [--engine chromium|webkit] [--click <selector>] [--type-into <selector> <text>]';
 
 function usage(message) {
   console.error(`crop.js: ${message}\n${USAGE}`);
@@ -31,7 +34,7 @@ function parse(argv) {
   const [base, label, selector, ...rest] = argv;
   if (!base || !label || !selector) usage('give a base URL, a label and a selector');
   if (!/^[A-Za-z0-9._-]+$/.test(label)) usage(`'${label}' must be letters, digits, . _ -`);
-  const opts = { base: base.replace(/\/$/, ''), label, selector, page: '', width: 1280, engine: 'chromium', typeInto: null, text: '' };
+  const opts = { base: base.replace(/\/$/, ''), label, selector, page: '', width: 1280, engine: 'chromium', click: null, typeInto: null, text: '' };
   let gotPage = false;
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--width') {
@@ -40,6 +43,9 @@ function parse(argv) {
     } else if (rest[i] === '--engine') {
       opts.engine = rest[++i];
       if (!['chromium', 'webkit'].includes(opts.engine)) usage(`--engine is chromium or webkit, not '${opts.engine}'`);
+    } else if (rest[i] === '--click') {
+      if (rest[i + 1] === undefined) usage('--click needs a selector');
+      opts.click = rest[++i];
     } else if (rest[i] === '--type-into') {
       if (rest[i + 1] === undefined || rest[i + 2] === undefined) usage('--type-into needs a selector and the text to type');
       opts.typeInto = rest[++i];
@@ -65,6 +71,13 @@ function parse(argv) {
   const page = await browser.newPage({ viewport: { width: opts.width, height: 900 }, deviceScaleFactor: 2 });
   await page.goto(opts.base + '/' + opts.page, { waitUntil: 'networkidle' });
   await page.waitForTimeout(400);
+  if (opts.click !== null) {
+    const target = await page.$(opts.click);
+    if (!target) { console.error(`crop.js: nothing matches ${opts.click}`); await browser.close(); process.exit(1); }
+    await target.click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(400);
+  }
   if (opts.typeInto !== null) {
     const box = await page.$(opts.typeInto);
     if (!box) { console.error(`crop.js: nothing matches ${opts.typeInto}`); await browser.close(); process.exit(1); }

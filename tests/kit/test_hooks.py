@@ -156,6 +156,32 @@ def test_ground_truth_reports_branch(hooks, repo):
     assert "sandbox:" in report and "tree: clean" in report
 
 
+def _ground_truth(hooks: Path, repo: Path) -> str:
+    done = subprocess.run(
+        ["python3", str(hooks / "session-ground-truth.py")],
+        input=json.dumps({"cwd": str(repo)}), capture_output=True, text=True, cwd=repo,
+    )
+    return json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
+
+
+def test_ground_truth_names_an_absent_nested_clone_and_how_to_clone_it(hooks, repo):
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "github.local.conf").write_text(
+        'GH_REPOS="site drafts"\nNESTED_DIRS="_drafts:drafts _scratch"  # second has no repo\n')
+    report = _ground_truth(hooks, repo)
+    assert "nested: _drafts ABSENT" in report
+    assert "sh scripts/git-clone-agent.sh drafts _drafts" in report
+    assert "_scratch" not in report
+
+
+def test_ground_truth_is_quiet_when_every_nested_clone_is_there(hooks, repo):
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "github.local.conf").write_text('NESTED_DIRS="_drafts:drafts"\n')
+    (repo / "_drafts").mkdir()
+    git(repo / "_drafts", "init", "-q")
+    assert "nested:" not in _ground_truth(hooks, repo)
+
+
 # --- analysable commands, sed, awk, inline programs ------------------------------------------
 
 @pytest.mark.parametrize("hook,command", [
@@ -180,6 +206,9 @@ def test_ground_truth_reports_branch(hooks, repo):
     ("guard-unanalyzable-bash.py", 'grep "$[a]" f'),
     ("guard-unanalyzable-bash.py", "curl --proto =https --output tmp/x https://x"),
     ("guard-unanalyzable-bash.py", "ls =python3"),
+    # Both reached the human as prompts: the checker reads `|=name` inside quotes.
+    ("guard-unanalyzable-bash.py", 'grep -rnE "proto|=cmd|lone" tests/x.py'),
+    ("guard-unanalyzable-bash.py", "grep -n -E 'proto|equals|=https' tests/x.py"),
 ])
 def test_guard_refusals(hooks, tmp_path, hook, command):
     assert denied(run_hook(hooks / hook, command, tmp_path))
@@ -197,6 +226,9 @@ def test_guard_refusals(hooks, tmp_path, hook, command):
     ("guard-unanalyzable-bash.py", "curl --proto '=https' --output tmp/x https://x"),
     ("guard-unanalyzable-bash.py", "git log --format=%h --since=yesterday"),
     ("guard-unanalyzable-bash.py", "grep -n 'a = b' f"),
+    ("guard-unanalyzable-bash.py", 'test "$a" = b'),
+    ("guard-unanalyzable-bash.py", "grep -n 'proto=https' f"),
+    ("guard-unanalyzable-bash.py", "grep -n -E 'a|= b' f"),
     ("guard-unanalyzable-bash.py", "echo '$(not run)'"),
     ("guard-unanalyzable-bash.py", "python3 -m json.tool f > /dev/null"),
     ("guard-unanalyzable-bash.py", "sh scripts/gh-read.sh 'repos/o/r?a=1&b=2' --fields a,b"),

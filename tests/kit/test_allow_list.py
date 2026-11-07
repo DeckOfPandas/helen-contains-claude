@@ -53,6 +53,9 @@ REVIEWED_OPEN_RULES = {
     "Bash(sh scripts/check-link.sh *)",
     # One optional repo name from GH_REPOS; a GET through gh-agent.sh.
     "Bash(sh scripts/main-ci-status.sh *)",
+    # Paths under tests/, -q/-x/-v and a plain -k; never --basetemp, -p, -c or
+    # --rootdir. test_wrappers.py pins every refusal.
+    "Bash(sh scripts/pytest.sh *)",
     # A NESTED_DIRS folder and a fixed list of verbs, hooks and external diff
     # off, commit refused on main; tests/kit/test_git_nested.py pins it.
     "Bash(sh scripts/git-nested.sh *)",
@@ -63,6 +66,10 @@ REVIEWED_OPEN_RULES = {
     "Bash(node tools/dev/slice-png.js *)",
     "Bash(node tools/dev/crop.js *)",
     "Bash(node tools/dev/styles.js *)",
+    "Bash(node tools/dev/gaps.js *)",
+    # Arguments go to the script, never to python3. One .png under tmp/ and a
+    # number; reads that file, writes nothing.
+    "Bash(python3 tools/dev/inkbox.py *)",
 }
 
 
@@ -119,6 +126,15 @@ def test_merging_and_approving_stay_denied():
         assert rule in deny, f"{rule} left the deny list"
 
 
+def test_the_github_config_cannot_be_edited():
+    """scripts/github.local.conf lists the repos the wrappers may act on, so a
+    session that could edit it could widen its own reach."""
+    deny = set(_rules("deny"))
+    for tool in ("Edit", "Write"):
+        for path in ("./scripts/github.local.conf", "//workspace/scripts/github.local.conf"):
+            assert f"{tool}({path})" in deny, f"{tool}({path}) left the deny list"
+
+
 def test_no_allow_rule_lets_curl_choose_where_to_write():
     """`curl -o <path>` writes anywhere, and a rule ending ` *` accepts it."""
     for rule in _rules("allow"):
@@ -128,10 +144,12 @@ def test_no_allow_rule_lets_curl_choose_where_to_write():
 def test_pytest_is_allowed_only_without_arguments():
     """`--basetemp=<dir>` empties the folder it names, so a pytest rule ending
     ` *` would let one unasked call wipe the project. pytest.ini pins basetemp
-    to tmp/pytest; anything past `-q` asks."""
+    to tmp/pytest; anything past `-q` asks, or goes through scripts/pytest.sh,
+    which checks every argument."""
     for rule in _rules("allow"):
         if "pytest" in rule:
-            assert rule in ("Bash(python3 -m pytest)", "Bash(python3 -m pytest -q)"), rule
+            assert rule in ("Bash(python3 -m pytest)", "Bash(python3 -m pytest -q)",
+                            "Bash(sh scripts/pytest.sh *)"), rule
 
 
 def test_no_allow_rule_runs_a_tmp_script():
