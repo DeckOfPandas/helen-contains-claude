@@ -66,17 +66,36 @@ REVIEWED_OPEN_RULES = {
 }
 
 
+PROJECT_SETTINGS = ROOT / ".claude" / "settings.project.json"
+
+
+def _project_reviewed() -> dict[str, str]:
+    """A project's own open-ended rules, each with the note saying what was
+    checked: `_reviewedOpenRules` in .claude/settings.project.json."""
+    if not PROJECT_SETTINGS.is_file():
+        return {}
+    return json.loads(PROJECT_SETTINGS.read_text(encoding="utf-8")).get("_reviewedOpenRules", {})
+
+
+def test_every_project_review_says_what_was_checked():
+    for rule, note in _project_reviewed().items():
+        assert isinstance(note, str) and note.strip(), (
+            f"{rule} in settings.project.json's _reviewedOpenRules has no note: say which "
+            "options of the tool you checked for running a program or writing a file")
+
+
 def test_every_open_ended_allow_rule_has_been_reviewed():
     open_rules = {rule for rule in _rules("allow") if rule.endswith(" *)")}
     assert open_rules, "found no open-ended allow rules at all -- parsing broke?"
-    unreviewed = sorted(open_rules - REVIEWED_OPEN_RULES)
+    unreviewed = sorted(open_rules - REVIEWED_OPEN_RULES - set(_project_reviewed()))
     assert not unreviewed, (
         "these allow rules accept ANY further arguments and have not been "
         f"reviewed: {unreviewed}. Check the tool has no option that runs a "
         "program or writes outside the project (git fetch --upload-pack, git "
         "clone --template, node --import), prefer an exact command or a "
         "wrapper that checks its own arguments, and only then add it to "
-        "REVIEWED_OPEN_RULES."
+        "REVIEWED_OPEN_RULES (a kit rule) or to _reviewedOpenRules in "
+        ".claude/settings.project.json (a project rule)."
     )
 
 

@@ -11,6 +11,7 @@ kit.env
 kit.local.env
 kit.local.example.env
 devcontainer.json
+devcontainer.template.json
 project.bashrc
 build_inputs_hash.py
 claude_code_latest.py

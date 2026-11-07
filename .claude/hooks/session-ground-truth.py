@@ -4,10 +4,12 @@
 A bind-mounted checkout can change branch under a running session with no
 signal, so the facts go in the first thing a session reads: the checkout's
 path, whether this is the container or the bare host, the branch, uncommitted
-changes, and the position against `origin/main` as last fetched.
+changes, the position against `origin/main` as last fetched, and how far the
+project's kit commit (.claude/kit/kit.lock) is behind the kit clone in tmp/kit.
 
-No network call and no fetch: a hook that waits on GitHub delays every start.
-It never blocks; anything that fails degrades to a line saying so.
+It never waits on the network: a hook that waits on GitHub delays every start.
+The one network call, a fetch of tmp/kit, runs detached and serves the next
+session. It never blocks; anything that fails degrades to a line saying so.
 
 Invoked as `python3 <path>` so it needs no execute bit.
 """
@@ -91,6 +93,50 @@ def _position_line(root: Path) -> str:
     return f"vs origin/main: {', '.join(parts)} (as last fetched){tail}"
 
 
+def _kit_clone(root: Path) -> Path | None:
+    """tmp/kit in this checkout, else in the main checkout: a worktree rarely
+    has its own."""
+    common = _git_in(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    for checkout in (root, Path(common).parent if common else None):
+        if checkout and (checkout / "tmp" / "kit" / ".git").exists():
+            return checkout
+    return None
+
+
+def _refresh_in_background(checkout: Path, repo: str) -> None:
+    """Fetches the kit clone's main without waiting, so the next session's
+    count is current. Offline it fails silently; it never moves HEAD."""
+    try:
+        subprocess.Popen(
+            ["sh", "scripts/git-fetch-agent.sh", "tmp/kit", repo, "main", "--keep-head"],
+            cwd=checkout, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, start_new_session=True,
+        )
+    except OSError:
+        pass
+
+
+def _kit_line(root: Path) -> str:
+    if (root / "kit" / "manifest").is_file():
+        return "kit: this repo is the kit"
+    try:
+        lock = json.loads((root / ".claude" / "kit" / "kit.lock").read_text(encoding="utf-8"))
+        commit, repo = str(lock["kit_commit"]), str(lock.get("kit_repo", ""))
+    except (OSError, ValueError, KeyError, TypeError):
+        return "kit: no readable .claude/kit/kit.lock -- never synced? /kit-sync"
+    checkout = _kit_clone(root)
+    if checkout is None:
+        return f"kit: synced at {commit[:12]}; no tmp/kit clone to compare with -- /kit-sync clones one"
+    if repo:
+        _refresh_in_background(checkout, repo)
+    behind = _git_in(checkout / "tmp" / "kit", "rev-list", "--count", f"{commit}..origin/main")
+    if behind is None:
+        return f"kit: synced at {commit[:12]}, which tmp/kit's origin/main does not contain"
+    if behind == "0":
+        return f"kit: up to date (synced at {commit[:12]}; as last fetched)"
+    return f"kit: {behind} commits behind (synced at {commit[:12]}; as last fetched) -- /kit-sync"
+
+
 def main() -> int:
     try:
         raw = sys.stdin.read()
@@ -99,7 +145,8 @@ def main() -> int:
         except (json.JSONDecodeError, ValueError):
             payload = {}
         root = resolve_root(payload if isinstance(payload, dict) else {})
-        lines = [_sandbox_line(), _branch_line(root), _dirty_line(root), _position_line(root)]
+        lines = [_sandbox_line(), _branch_line(root), _dirty_line(root), _position_line(root),
+                 _kit_line(root)]
         report = f"Where this session actually is -- {root}:\n" + "\n".join(
             f"  {line}" for line in lines
         )

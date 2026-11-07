@@ -97,6 +97,15 @@ The mechanism behind each hook is in [`.claude/hooks/README.md`](.claude/hooks/R
 
 You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 
+0. **Make the project from the kit.** In the new project's empty git repo,
+   with the kit cloned beside it:
+
+       python3 ../helen-contains-claude-webdev/tools/kit/sync.py --kit ../helen-contains-claude-webdev --adopt
+
+   That writes the kit's files, this project's own starting files (`CLAUDE.md`,
+   `kit.env`, `.gitignore`…) and `.claude/kit/kit.lock`. Don't copy the kit
+   repo wholesale: its `kit/` folder marks a repo as the kit itself.
+
 1. **Name it.** This names the image, the container and the volumes:
 
        python3 .devcontainer/set-project-name.py myproject
@@ -126,7 +135,8 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
      and `MAIN_PUSH_REPOS` if any repo may take direct pushes to `main`.
 
 4. **Fill in `CLAUDE.md`**: the project name, the build/test commands, and
-   any project rules.
+   any project rules. The kit's rules arrive through its
+   `@.claude/kit/RULES.md` line; don't edit that file here.
 
 5. **Run it:**
 
@@ -141,6 +151,28 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 `--build-only` builds and stops. For VS Code, use Dev Containers →
 **Reopen in Container**: `devcontainer.json` runs `run.sh --build-only` first,
 so both routes use the same image.
+
+## Staying in step with the kit
+
+Every file has one owner (`kit/manifest` in the kit): the kit's files arrive
+by sync, the project's own are never touched, and `.claude/settings.json` and
+`devcontainer.json` are generated from a kit part and a project part.
+
+- **Sync:** tell Claude "sync the kit" (`/kit-sync`). It opens one PR, or
+  nothing when the kit hasn't moved, and says when to run `run.sh` again.
+- **Which kit am I on?** `python3 tools/kit/sync.py --status`, and every
+  session starts with a `kit:` line saying how far behind it is.
+- **A kit file edited in a project** turns the suite red, naming the file.
+  The change goes to the kit as a PR there, then comes back by sync.
+- **Project additions** go in `.claude/settings.project.json` (allow rules,
+  hooks) and `.devcontainer/kit.env`; then `python3 tools/kit/build.py`. A
+  project allow rule can't undo a kit deny: the builder refuses it.
+- **A Jekyll site** must exclude the kit's folders (`scripts`, `tests`,
+  `tools`) in `_config.yml`; `tests/kit/test_site_excludes_kit.py` checks it,
+  and checks the built site when there is one.
+- **Never start Claude inside a nested clone** (a drafts folder, say): the
+  project's rules and guard hooks don't load there. A hook baked into the
+  image warns if you do.
 
 ## When things bite
 
@@ -161,10 +193,11 @@ so both routes use the same image.
   primary clone.
 - **A server must listen on `0.0.0.0`** to be reachable through a published port.
 - **VS Code and the token:** export `AGENT_GH_TOKEN` in the host shell VS
-  Code starts from. For the firewall, add
+  Code starts from. The firewall needs
   `"runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW"]` and
-  `"postStartCommand": "sudo /usr/local/bin/init-firewall.sh"` to
-  `devcontainer.json`.
+  `"postStartCommand": "sudo /usr/local/bin/init-firewall.sh"` in
+  `devcontainer.json`, which is generated: an edit there is undone by the
+  next build, and `kit.env` has no toggle for it yet.
 
 ## Tests
 

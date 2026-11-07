@@ -118,6 +118,12 @@ RUN chmod 0755 /usr/local/bin/init-firewall.sh \
       for domain in $EXTRA_ALLOWED_DOMAINS; do printf '%s\n' "$domain"; done; \
     } > /etc/claude-kit/allowed-domains
 
+# Managed settings apply to every Claude session in the container, wherever it
+# starts, and root owns them, so nothing inside can switch the hook off. It
+# warns a session started in a nested clone, where the project's hooks don't run.
+COPY managed-settings.json /etc/claude-code/managed-settings.json
+COPY session-place.py /usr/local/share/claude-kit/session-place.py
+
 # container.bashrc guards against host dotfiles that reload ~/.bashrc.
 COPY container.bashrc /usr/local/share/claude-kit/container.bashrc
 RUN cat /usr/local/share/claude-kit/container.bashrc >> "/home/$USERNAME/.bashrc" \
