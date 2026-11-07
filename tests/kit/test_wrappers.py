@@ -180,11 +180,46 @@ def test_issue_label(project):
     assert "repos/acme/site/issues/5/labels" in out and "labels[]=parked" in out and "POST" in out
 
 
+def test_a_label_may_hold_single_spaces(project):
+    out = ok(run(project, "gh-write.sh", "issue-label", "site", "5", "devops and docs"))
+    assert "labels[]=devops and docs" in out
+
+
+def _without_dry_run(project: Path, *args: str, agent_exit: int):
+    """gh-write.sh for real, with gh-agent.sh replaced by a stub that records
+    its arguments and exits `agent_exit`: nothing reaches the network."""
+    (project / "scripts" / "gh-agent.sh").write_text(
+        f'printf "%s\\n" "$@" >> "{project}/tmp/agent-calls"\nexit {agent_exit}\n')
+    return subprocess.run(
+        ["sh", "scripts/gh-write.sh", *args], cwd=project, capture_output=True, text=True,
+        timeout=30, env={"PATH": "/usr/local/bin:/usr/bin:/bin",
+                         "GIT_CEILING_DIRECTORIES": str(project.parent)})
+
+
+@pytest.mark.parametrize("args", [
+    ["issue-label", "site", "5", "no such label"],
+    ["issue-create", "site", "T", "tmp/body.md", "nolabel"],
+])
+def test_a_label_that_does_not_exist_is_refused_before_any_write(project, args):
+    result = _without_dry_run(project, *args, agent_exit=1)
+    assert refused(result) and "not an existing label" in result.stderr
+    calls = (project / "tmp" / "agent-calls").read_text().splitlines()
+    assert "POST" not in calls, "the write ran although the label check failed"
+    assert any(c.startswith("repos/acme/site/labels/") for c in calls)
+
+
+def test_the_label_check_encodes_spaces(project):
+    _without_dry_run(project, "issue-label", "site", "5", "devops and docs", agent_exit=1)
+    calls = (project / "tmp" / "agent-calls").read_text().splitlines()
+    assert "repos/acme/site/labels/devops%20and%20docs" in calls
+
+
 @pytest.mark.parametrize("args", [
     ["issue-create", "other", "T", "tmp/body.md"],
     ["issue-create", "site", "", "tmp/body.md"],
     ["issue-create", "site", "T", "body.md"],
-    ["issue-create", "site", "T", "tmp/body.md", "two words"],
+    ["issue-create", "site", "T", "tmp/body.md", "two  words"],
+    ["issue-create", "site", "T", "tmp/body.md", " lead"],
     ["issue-create", "site", "T", "tmp/body.md", "-x"],
     ["issue-create", "site", "T", "tmp/body.md", "a", "b"],
     ["label-create", "site", "parked", "#9a9a9a"],
@@ -194,7 +229,9 @@ def test_issue_label(project):
     ["label-create", "other", "parked", "9a9a9a"],
     ["issue-label", "site", "05", "parked"],
     ["issue-label", "site", "x", "parked"],
-    ["issue-label", "site", "5", "two words"],
+    ["issue-label", "site", "5", "two  words"],
+    ["issue-label", "site", "5", "trail "],
+    ["issue-label", "site", "5", "a/b"],
     ["issue-label", "site", "5", "-x"],
     ["issue-label", "other", "5", "parked"],
     ["issue-label", "site", "5"],
