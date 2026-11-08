@@ -105,14 +105,28 @@ load_conf() {
     in_list "$repo" $GH_REPOS || refuse "$conf_name:PR_ONLY_REPOS names '$repo', which is not in GH_REPOS"
     ! in_list "$repo" $MAIN_PUSH_REPOS || refuse "$conf_name:'$repo' is in both PR_ONLY_REPOS and MAIN_PUSH_REPOS"
   done
-  # An entry is `folder` or `folder:repo`; the repo is only for
-  # session-ground-truth.py's clone hint. NESTED_DIRS leaves holding folders only.
+  # An entry is `path` or `path:repo`; the repo is only for
+  # session-ground-truth.py's clone hint. NESTED_DIRS leaves holding paths only.
+  # A path is folder names joined by `/`, each one plain and not starting `.`
+  # or `-`, so it can name neither `..`, `.git`, an option nor anywhere outside.
   folders=""
   for entry in $NESTED_DIRS; do
     dir="${entry%%:*}"
     case "$dir" in
-      -* | .* | *[!A-Za-z0-9._-]*) refuse "$conf_name:NESTED_DIRS '$dir' is not one folder name in this checkout" ;;
+      "" | /* | */ | *//* | *[!A-Za-z0-9._/-]*)
+        refuse "$conf_name:NESTED_DIRS '$dir' is not a folder path in this checkout" ;;
     esac
+    rest="$dir"
+    while [ -n "$rest" ]; do
+      part="${rest%%/*}"
+      case "$part" in
+        -* | .*) refuse "$conf_name:NESTED_DIRS '$dir' has a folder name starting '-' or '.'" ;;
+      esac
+      case "$rest" in
+        */*) rest="${rest#*/}" ;;
+        *) rest="" ;;
+      esac
+    done
     case "$entry" in
       *:*)
         # shellcheck disable=SC2086
