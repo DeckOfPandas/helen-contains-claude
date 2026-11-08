@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import denied, run_hook
+from .conftest import denied, run_hook
 
 HOUR = 60 * 60
 CREATE_PR = 'sh scripts/gh-write.sh pr-create site feat "Title" tmp/body.md'

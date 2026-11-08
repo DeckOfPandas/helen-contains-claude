@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from test_wrappers import CONF, ok, project, refused, run  # noqa: F401  (project is a fixture)
+from .test_wrappers import CONF, ok, project, refused, run  # noqa: F401  (project is a fixture)
 
 NESTED_CONF = CONF + 'NESTED_DIRS="_drafts _other"\n'
 SAFE = ["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-C", "_drafts"]

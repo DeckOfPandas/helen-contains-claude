@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import load_tool
+from .conftest import load_tool
 
 ROOT = Path(__file__).resolve().parents[2]
 build = load_tool("build")
