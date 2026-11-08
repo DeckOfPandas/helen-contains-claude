@@ -4,7 +4,7 @@ The kit is a template, so what it commits is what every new project starts
 from. Keep the committed copies as placeholders (`PROJECT_NAME=changeme`,
 `your-org`, `<PROJECT>`) and put your own values in the gitignored local files:
 
-    cp .devcontainer/kit.local.example.env .devcontainer/kit.local.env   # PROJECT_NAME
+    cp .devcontainer/kit.local.example.env .devcontainer/kit.local.env   # PROJECT_NAME, PORTS
     cp scripts/github.conf scripts/github.local.conf                     # GitHub
     cp .claude/settings.local.example.json .claude/settings.local.json   # token
 

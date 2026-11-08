@@ -21,13 +21,14 @@ project. A project's own rules, and any it sets against these, are in its
 - **Scratch files go in this project's `tmp/`** (gitignored), never the system
   `/tmp`, never `~`, and never `$CLAUDE_JOB_DIR` or the jobs folder that
   background-job tooling suggests.
-- **Show me a branch on a server; never ask me to pull and build.** Read
-  `PORTS` in `.devcontainer/kit.env` (`host:container` pairs), run `ss -ltn`
+- **Show me a branch on a server; never ask me to pull and build.** Read the
+  pairs in force with `printenv KIT_PORTS` (`host:container`; `run.sh` sets it
+  from `kit.local.env` or `kit.env`; unset, read `PORTS` in
+  `.devcontainer/kit.env`), run `ss -ltn`
   and take a free container port, serve your own worktree in the background on
   `0.0.0.0:<container port>`, and give me `http://localhost:<host port>/`, plus
   the `baseurl` from `_config.yml` for a Jekyll site. Never stop a server you
-  did not start. No free pair in `PORTS` means I can't reach it: ask me to add
-  one.
+  did not start. No free pair means I can't reach it: ask me to add one.
 - **Tests:** one test run at a time, never two. The whole suite is
   `python3 -m pytest`; part of it is `sh scripts/pytest.sh [-q] [-x] [-v]
   [-k <expr>] tests/<path>...`, never `python3 -m pytest <args>`, which asks
