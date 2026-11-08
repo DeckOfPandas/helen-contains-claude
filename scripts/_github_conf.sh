@@ -37,7 +37,10 @@ conf_path() {
     printf '%s' "$here/github.local.conf"
     return
   fi
-  common="$(git -C "$here" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  # git-remote-https hands the credential helper the pushing repo's GIT_DIR,
+  # relative to a nested clone, which would hide this checkout's own.
+  common="$(unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE
+    git -C "$here" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
   if [ -n "$common" ] && [ -f "$(dirname "$common")/scripts/github.local.conf" ]; then
     printf '%s' "$(dirname "$common")/scripts/github.local.conf"
     return
