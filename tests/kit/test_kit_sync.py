@@ -293,6 +293,21 @@ def test_a_jekyll_project_must_exclude_the_kit(project):
     assert done.returncode == 0, done.stdout
 
 
+def test_the_kits_tests_leave_a_projects_own_conftest_and_names_alone(project):
+    """A project's tests/conftest.py and a project test sharing a kit test's
+    name, run in one session with the kit's tests collected first."""
+    tests = project / "tests"
+    (tests / "conftest.py").write_text('ROOT = "the project\'s"\n')
+    (tests / "test_ours.py").write_text(
+        "from conftest import ROOT\n\ndef test_it():\n    assert ROOT == \"the project's\"\n")
+    (tests / "test_hooks.py").write_text("def test_a_project_test_of_the_same_name():\n    pass\n")
+    done = subprocess.run(["python3", "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                           "tests/kit/test_kit_lock.py", "tests/kit/test_hooks.py",
+                           "tests/test_ours.py", "tests/test_hooks.py"],
+                          cwd=project, capture_output=True, text=True, timeout=120)
+    assert done.returncode == 0, done.stdout
+
+
 def test_the_projects_suite_goes_red_on_an_edited_kit_file(project):
     """The lock test that ships to projects, run inside one."""
     guard = project / ".claude" / "hooks" / "guard-awk.py"
