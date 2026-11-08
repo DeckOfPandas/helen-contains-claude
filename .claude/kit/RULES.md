@@ -174,7 +174,9 @@ project. A project's own rules, and any it sets against these, are in its
 ## Writing
 - **A code comment states a constraint the code cannot show**, in the present
   tense. No dates, no history, no "used to". The story goes in the commit
-  message.
+  message. At most eight lines a block, fifteen for a file header (a shell
+  script's header is its manual); `tests/kit/test_comment_length.py` holds the
+  kit's files to it.
 - **When code changes, rewrite its comment.** Never append a paragraph beneath
   the old one. Delete the comment when its code goes. Before a comment names a
   file, test or function, check it exists; never write a count a command can
