@@ -89,7 +89,7 @@ do instead.
 - Anything that has to reach outside the project is written to a script in `scripts/` with one fixed action, checked arguments, safety stated at
   the top, and tests. It goes on the allow list only when I say so.
 - A recommendation to add a GitHub ruleset on `main`, for when everything above has somehow failed.
-- No bursts of issues or PRs to avoid GitHub flagging the account as spam. `guard-github-burst.py` allows one every 5 minutes, and 20 issues or 5 PRs a day, and none from inside a script, since a script can loop. `github-public-status.sh` checks whether it happened anyway: a page that's 404 logged out but 200 through the API.
+- No bursts of issues or PRs to avoid GitHub flagging the account as spam. `guard-github-burst.py` allows one every 5 minutes, and 20 issues or 20 PRs a day, and none from inside a script, since a script can loop. `github-public-status.sh` checks whether it happened anyway: a page that's 404 logged out but 200 through the API.
 
 The mechanism behind each hook is in [`.claude/hooks/README.md`](.claude/hooks/README.md).
 
