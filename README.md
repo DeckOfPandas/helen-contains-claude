@@ -12,7 +12,7 @@ The threat model is only honest mistakes. Hooks make printing the token hard, no
 
 **Container.** Only the project is mounted, at `/workspace`. No home directory, no SSH keys. Claude's login and config live in a per-project Docker volume. It runs as my uid, never root, and is `--rm`, so anything installed mid-session is gone when I exit, which is the correct amount of time for a unit of my attention to exist. One container per project: parallel sessions use git worktrees. Only the ports I list are published.
 
-**Network** (`run.sh --firewall`). Outbound traffic is dropped except to Anthropic, npm, GitHub, `storage.googleapis.com`, whatever the toggles need, and `EXTRA_ALLOWED_DOMAINS`. The list is baked into the image, root-owned, and the firewall script takes no arguments. It checks itself on start: example.com must fail, api.github.com must work.
+**Network** (on by default; `run.sh --no-firewall` opens it for one run). Outbound traffic is dropped except to Anthropic, npm, GitHub, `storage.googleapis.com`, whatever the toggles need, and `EXTRA_ALLOWED_DOMAINS`. The list is baked into the image, root-owned, and the firewall script takes no arguments. It checks itself on start: example.com must fail, api.github.com must work.
 
 **Reads.** Nothing outside the working directory except `/opt` and other agents' worktrees. No `.env` files, no `.claude/settings.local.json`.
 
@@ -73,7 +73,7 @@ Needs Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 
 4. **Fill in `CLAUDE.md`'s "This project" section.** The kit's rules arrive via `@.claude/kit/RULES.md`.
 
-5. **Run:** `bash .devcontainer/run.sh` (or `--firewall`), then `claude` or `claude --worktree whatever`. Logging in (via Anthropic) is only required once per project. `--rebuild` starts from scratch. VS Code's **Reopen in Container** uses the same image.
+5. **Run:** `bash .devcontainer/run.sh`, then `claude` or `claude --worktree whatever`. Logging in (via Anthropic) is only required once per project. `--rebuild` starts from scratch. VS Code's **Reopen in Container** uses the same image.
 
 Handy hint: **to pin the Claude Code version**, `PIN_CLAUDE_CODE=2.1.0 bash .devcontainer/run.sh`.
 
@@ -96,6 +96,6 @@ Handy hint: **to pin the Claude Code version**, `PIN_CLAUDE_CODE=2.1.0 bash .dev
 - **Upstream base-image and apt changes don't trigger a rebuild.** Use `--rebuild`.
 - **To try a branch's container changes**, run its worktree's `run.sh` from the host.
 - **`.devcontainer/kit.local.env`** (gitignored) can override `PROJECT_NAME` and `PORTS` for one machine. Mostly for the kit's own checkout; a project should commit both.
-- **VS Code:** export `AGENT_GH_TOKEN` in the shell it starts from. `--firewall` has no VS Code toggle yet.
+- **VS Code:** export `AGENT_GH_TOKEN` in the shell it starts from. VS Code starts its container itself, so it runs without the firewall.
 
 Working on the kit itself: [`docs/maintaining-the-kit.md`](docs/maintaining-the-kit.md).

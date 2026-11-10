@@ -219,7 +219,15 @@ def test_run_sh_builds_then_runs(project):
     assert "CLAUDE_CODE_VERSION=9.9.9" in build and "-t demo-devcontainer" in build
     run = next(c for c in calls if c.startswith("docker run"))
     assert "--name demo-primary" in run and "demo-claude-config:/state/claude-config" in run
-    assert "AGENT_GH_TOKEN" not in run and "NET_ADMIN" not in run and "bundle" not in run
+    assert "AGENT_GH_TOKEN" not in run and "bundle" not in run
+    assert "--cap-add=NET_ADMIN" in run and "init-firewall.sh" in run, "the firewall is not on by default"
+
+
+def test_run_sh_no_firewall_turns_it_off_for_one_run(project):
+    done, calls = run_sh(project, "--no-firewall")
+    assert done.returncode == 0, done.stderr
+    run = next(c for c in calls if c.startswith("docker run"))
+    assert "NET_ADMIN" not in run and "NET_RAW" not in run and "init-firewall.sh" not in run
 
 
 def test_run_sh_toggles_and_flags(project):
