@@ -20,7 +20,7 @@ The goal of this kit is to make it easy to set up a web project running Claude C
 - My dotfiles go in read-only for quality of life (`MOUNT_DOTFILES`).
 - One container per project. A second `run.sh` is refused, so two Claudes
   never fight over one working tree. Parallel sessions use git worktrees.
-- Ports are published only if I list them in `PORTS`.
+- Ports are published only if I list them in `PORTS`, and only on `127.0.0.1` unless `PORTS_ON_LAN=1`.
 
 **Network** (`run.sh --firewall`)
 - Outbound traffic is dropped except to Anthropic, npm, GitHub, `storage.googleapis.com`, whatever my toggles need (rubygems, PyPI), and

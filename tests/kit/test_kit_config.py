@@ -173,8 +173,10 @@ KIT_DEFAULTS = {
     "WITH_RUBY": "0",
     "WITH_PLAYWRIGHT": "0",
     "WITH_AUDIVERIS": "0",
+    "AUDIVERIS_VERSION": "5.11.0",
     "WITH_PY_REQS": "0",
     "PORTS": '""',
+    "PORTS_ON_LAN": "0",
     "EXTRA_ALLOWED_DOMAINS": '""',
     "MOUNT_DOTFILES": "1",
 }
@@ -187,7 +189,11 @@ def project(tmp_path: Path, kit_root: Path) -> Path:
     kit = tmp_path / ".devcontainer" / "kit.env"
     text = kit.read_text()
     for key, value in KIT_DEFAULTS.items():
-        text = re.sub(rf"^{key}=.*$", f"{key}={value}", text, flags=re.MULTILINE)
+        # A project's kit.env predates any key the kit added since, and the
+        # tests edit each key's line, so a missing one is written in.
+        text, found = re.subn(rf"^{key}=.*$", f"{key}={value}", text, flags=re.MULTILINE)
+        if not found:
+            text += f"{key}={value}\n"
     kit.write_text(text)
     subprocess.run(["python3", ".devcontainer/set-project-name.py", "demo"], cwd=tmp_path, check=True,
                    capture_output=True)
@@ -231,8 +237,18 @@ def test_run_sh_toggles_and_flags(project):
     assert "BASE_IMAGE=ruby:3.3-slim-bookworm" in build and "WITH_RUBY=1" in build
     run = next(c for c in calls if c.startswith("docker run"))
     assert "-e AGENT_GH_TOKEN" in run and "--cap-add=NET_ADMIN" in run
-    assert "-p 5998:4000" in run and "demo-bundle-cache:/state/bundle" in run
+    assert "-p 127.0.0.1:5998:4000" in run and "demo-bundle-cache:/state/bundle" in run
     assert "init-firewall.sh" in run
+
+
+def test_ports_on_lan_publishes_on_every_interface(project):
+    text = (project / ".devcontainer" / "kit.env").read_text().replace('PORTS=""', 'PORTS="5998:4000"')
+    (project / ".devcontainer" / "kit.local.env").write_text("PORTS_ON_LAN=1\n")
+    done, calls = run_sh(project, kit_env_text=text)
+    assert done.returncode == 0, done.stderr
+    run = next(c for c in calls if c.startswith("docker run"))
+    assert "-p 5998:4000" in run and "127.0.0.1" not in run
+    assert "-e KIT_PORTS=5998:4000" in run
 
 
 def test_run_sh_passes_audiveris_to_the_build(project):
@@ -314,7 +330,7 @@ def test_kit_local_env_ports_replace_kit_envs(project):
     done, calls = run_sh(project, kit_env_text=text)
     assert done.returncode == 0, done.stderr
     run = next(c for c in calls if c.startswith("docker run"))
-    assert "-p 6000:6000" in run and "-p 6001:6001" in run and "5998" not in run
+    assert "-p 127.0.0.1:6000:6000" in run and "-p 127.0.0.1:6001:6001" in run and "5998" not in run
     assert "-e KIT_PORTS=6000:6000 6001:6001" in run
 
 
@@ -335,7 +351,7 @@ def test_kit_local_env_validates_its_ports(project):
 def test_kit_local_env_takes_only_the_name_and_ports(project):
     (project / ".devcontainer" / "kit.local.env").write_text("WITH_RUBY=1\n")
     done, calls = run_sh(project)
-    assert done.returncode == 1 and "only PROJECT_NAME and PORTS" in done.stderr
+    assert done.returncode == 1 and "only PROJECT_NAME, PORTS and PORTS_ON_LAN" in done.stderr
     assert calls == []
 
 
@@ -354,6 +370,7 @@ def test_the_local_example_is_all_comments(kit_root):
     (("AUDIVERIS_VERSION=5.11.0", "AUDIVERIS_VERSION=5.11"), "is not N.N.N"),
     (("AUDIVERIS_VERSION=5.11.0", "AUDIVERIS_VERSION=latest"), "is not N.N.N"),
     (('PORTS=""', 'PORTS="80"'), "host:container"),
+    (("PORTS_ON_LAN=0", "PORTS_ON_LAN=yes"), "must be 0 or 1"),
     (('EXTRA_ALLOWED_DOMAINS=""', 'EXTRA_ALLOWED_DOMAINS="a.com;b"'), "not a hostname"),
     (("PROJECT_NAME=demo", "PROJECT_NAME=changeme"), "set-project-name"),
 ])

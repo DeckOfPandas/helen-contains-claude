@@ -71,11 +71,12 @@ WITH_AUDIVERIS=0
 AUDIVERIS_VERSION=5.11.0
 WITH_PY_REQS=0
 PORTS=""
+PORTS_ON_LAN=0
 EXTRA_ALLOWED_DOMAINS=""
 MOUNT_DOTFILES=1
 
-# read_kit_file <file> <local>: with <local> = 1, only PROJECT_NAME and PORTS
-# are accepted, the two that can differ between machines.
+# read_kit_file <file> <local>: with <local> = 1, only PROJECT_NAME, PORTS and
+# PORTS_ON_LAN are accepted, the keys that can differ between machines.
 read_kit_file() {
   local file="$1" only_name="$2" line key value
   while IFS= read -r line || [ -n "$line" ]; do
@@ -93,12 +94,14 @@ read_kit_file() {
       \"*\") value="${value#\"}"; value="${value%\"}" ;;
       \'*\') value="${value#\'}"; value="${value%\'}" ;;
     esac
-    [ "$only_name" = 0 ] || [ "$key" = PROJECT_NAME ] || [ "$key" = PORTS ] \
-      || die "$file: only PROJECT_NAME and PORTS belong here, not '$key'"
+    case "$only_name:$key" in
+      0:* | 1:PROJECT_NAME | 1:PORTS | 1:PORTS_ON_LAN) ;;
+      *) die "$file: only PROJECT_NAME, PORTS and PORTS_ON_LAN belong here, not '$key'" ;;
+    esac
     case "$key" in
       PROJECT_NAME | NODE_MAJOR | WITH_RUBY | RUBY_VERSION | WITH_PLAYWRIGHT | \
       PLAYWRIGHT_VERSION | WITH_AUDIVERIS | AUDIVERIS_VERSION | WITH_PY_REQS | PORTS | \
-      EXTRA_ALLOWED_DOMAINS | MOUNT_DOTFILES)
+      PORTS_ON_LAN | EXTRA_ALLOWED_DOMAINS | MOUNT_DOTFILES)
         printf -v "$key" '%s' "$value" ;;
       *) die "$file: unknown key '$key'" ;;
     esac
@@ -118,7 +121,7 @@ KIT_LOCAL_ENV=.devcontainer/kit.local.env
   || die "PROJECT_NAME '$PROJECT_NAME' must be lowercase letters, digits, . _ -"
 [ "$PROJECT_NAME" != changeme ] \
   || die "set a PROJECT_NAME first: python3 .devcontainer/set-project-name.py <name>, or in $KIT_LOCAL_ENV"
-for flag in WITH_RUBY WITH_PLAYWRIGHT WITH_AUDIVERIS WITH_PY_REQS MOUNT_DOTFILES; do
+for flag in WITH_RUBY WITH_PLAYWRIGHT WITH_AUDIVERIS WITH_PY_REQS PORTS_ON_LAN MOUNT_DOTFILES; do
   [[ "${!flag}" =~ ^[01]$ ]] || die "$flag must be 0 or 1, not '${!flag}'"
 done
 [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]] || die "NODE_MAJOR '$NODE_MAJOR' is not a number"
@@ -220,8 +223,13 @@ if [ "$MOUNT_DOTFILES" = 1 ]; then
   [ -f "$HOME/.gitconfig" ] && RUN_ARGS+=(-v "$HOME/.gitconfig:/home/$USERNAME/.gitconfig:ro")
 fi
 
+# Docker publishes on every interface unless told otherwise, which on a server
+# means the internet; 127.0.0.1 keeps a dev server, drafts and all, to this
+# machine. PORTS_ON_LAN=1 lets other devices on the network reach it.
+BIND=127.0.0.1:
+[ "$PORTS_ON_LAN" = 0 ] || BIND=
 for pair in $PORTS; do
-  RUN_ARGS+=(-p "$pair")
+  RUN_ARGS+=(-p "$BIND$pair")
 done
 # Sessions cannot read kit.local.env, so the pairs in force reach them here.
 RUN_ARGS+=(-e "KIT_PORTS=$PORTS")
