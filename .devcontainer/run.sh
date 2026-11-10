@@ -2,11 +2,12 @@
 # Build this project's Claude Code image when it is missing or stale, then start
 # a shell in it with only the project mounted, at /workspace.
 #
-# USAGE:  .devcontainer/run.sh [--firewall] [--build-only] [--rebuild]
+# USAGE:  .devcontainer/run.sh [--no-firewall] [--build-only] [--rebuild]
 #
-#   --firewall    default-deny egress except an allowlist (init-firewall.sh)
-#   --build-only  build if needed and stop; devcontainer.json runs this
-#   --rebuild     rebuild from scratch, pulling the base image again
+#   (default)      egress denied except to an allowlist (init-firewall.sh)
+#   --no-firewall  open egress, for this run only (--firewall is a no-op)
+#   --build-only   build if needed and stop; devcontainer.json runs this
+#   --rebuild      rebuild from scratch, pulling the base image again
 #
 # What goes in the image is the kit.env and Dockerfile beside this script: run
 # a worktree's copy (.claude/worktrees/<name>/.devcontainer/run.sh) to build
@@ -19,13 +20,14 @@ die() {
   exit 1
 }
 
-FIREWALL=0
+FIREWALL=1
 BUILD_ONLY=0
 REBUILD=0
 SHOW_HELP=0
 for arg in "$@"; do
   case "$arg" in
     --firewall) FIREWALL=1 ;;
+    --no-firewall) FIREWALL=0 ;;
     --build-only) BUILD_ONLY=1 ;;
     --rebuild) REBUILD=1 ;;
     -h | --help) SHOW_HELP=1 ;;
@@ -33,7 +35,7 @@ for arg in "$@"; do
   esac
 done
 if [ "$SHOW_HELP" = 1 ]; then
-  head -n 14 "${BASH_SOURCE[0]}" | tail -n +2
+  head -n 15 "${BASH_SOURCE[0]}" | tail -n +2
   exit 0
 fi
 

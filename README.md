@@ -22,7 +22,7 @@ The goal of this kit is to make it easy to set up a web project running Claude C
   never fight over one working tree. Parallel sessions use git worktrees.
 - Ports are published only if I list them in `PORTS`.
 
-**Network** (`run.sh --firewall`)
+**Network** (on by default; `run.sh --no-firewall` opens it for one run)
 - Outbound traffic is dropped except to Anthropic, npm, GitHub, `storage.googleapis.com`, whatever my toggles need (rubygems, PyPI), and
   anything I add to `EXTRA_ALLOWED_DOMAINS`.
 - The allowlist is baked into the image in a root-owned file, and the firewall script doesn't take arguments, so nothing inside can finagle its way onto the list.
@@ -141,7 +141,7 @@ You need Docker and `python3` on the host (WSL2 + Docker Desktop is fine).
 
 5. **Run it:**
 
-       bash .devcontainer/run.sh            # or --firewall
+       bash .devcontainer/run.sh            # --no-firewall to open egress
        claude
 
    The first build takes a few minutes, as does the first after a change.
